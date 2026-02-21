@@ -99,9 +99,17 @@ namespace Muter
                 return;
             }
 
-            microphone.AudioEndpointVolume.Mute = !microphone.AudioEndpointVolume.Mute;
-            UpdateUIForMuteState();
-            RestartFadeOut();
+            try
+            {
+                microphone.AudioEndpointVolume.Mute = !microphone.AudioEndpointVolume.Mute;
+                UpdateUIForMuteState();
+                RestartFadeOut();
+            }
+            catch (COMException)
+            {
+                // Device was removed or changed mid-operation; refresh status.
+                UpdateMicrophoneStatus();
+            }
         }
 
         // Updates the microphone status and UI.
@@ -145,11 +153,18 @@ namespace Muter
         {
             if (microphone == null) return;
 
-            isMuted = microphone.AudioEndpointVolume.Mute;
-            pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
-            toggleText.Text = isMuted ? "OFF" : "ON";
-            toggleText.Location = new Point(isMuted ? 44 : 46, 2);
-            notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
+            try
+            {
+                isMuted = microphone.AudioEndpointVolume.Mute;
+                pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
+                toggleText.Text = isMuted ? "OFF" : "ON";
+                toggleText.Location = new Point(isMuted ? 44 : 46, 2);
+                notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
+            }
+            catch (COMException)
+            {
+                UpdateUINoDevice();
+            }
         }
 
         // Updates the UI when no microphone device is found.

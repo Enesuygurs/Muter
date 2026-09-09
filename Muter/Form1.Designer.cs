@@ -1,4 +1,4 @@
-﻿namespace Muter
+namespace Muter
 {
     partial class Form1
     {
@@ -32,8 +32,11 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.notifyIcon1 = new System.Windows.Forms.NotifyIcon(this.components);
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.defaultDeviceMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.runStartup = new System.Windows.Forms.ToolStripMenuItem();
             this.hotkeyForm = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fadeOutTimer = new System.Windows.Forms.Timer(this.components);
             this.title = new System.Windows.Forms.Label();
@@ -59,11 +62,32 @@
             // contextMenuStrip1
             // 
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.defaultDeviceMenuItem,
+            this.toolStripSeparator1,
             this.runStartup,
             this.hotkeyForm,
+            this.toolStripSeparator2,
             this.exitToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(138, 70);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(161, 104);
+            this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
+            // 
+            // defaultDeviceMenuItem
+            // 
+            this.defaultDeviceMenuItem.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
+            this.defaultDeviceMenuItem.Name = "defaultDeviceMenuItem";
+            this.defaultDeviceMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.defaultDeviceMenuItem.Text = "Varsayılan Aygıt";
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(157, 6);
+            // 
+            // toolStripSeparator2
+            // 
+            this.toolStripSeparator2.Name = "toolStripSeparator2";
+            this.toolStripSeparator2.Size = new System.Drawing.Size(157, 6);
             // 
             // runStartup
             // 
@@ -183,6 +207,9 @@
         private System.Windows.Forms.ToolStripMenuItem runStartup;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem hotkeyForm;
+        private System.Windows.Forms.ToolStripMenuItem defaultDeviceMenuItem;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.Timer fadeOutTimer;
         private System.Windows.Forms.Label title;
         private System.Windows.Forms.Label toggleText;

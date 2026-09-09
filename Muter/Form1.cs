@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using NAudio.CoreAudioApi;
 using System;
 using System.Drawing;
@@ -52,7 +52,8 @@ namespace Muter
         public Form1()
         {
             InitializeComponent();
-            watcher = new AudioDeviceWatcher();
+            string savedDeviceId = Properties.Settings.Default.selectedDeviceId;
+            watcher = new AudioDeviceWatcher(savedDeviceId);
             watcher.AudioDeviceChanged += OnAudioDeviceChanged;
             watcher.StartWatching();
             notifyIcon1.MouseClick += new MouseEventHandler(notifyIcon1_MouseClick);
@@ -108,6 +109,7 @@ namespace Muter
             catch (COMException)
             {
                 // Device was removed or changed mid-operation; refresh status.
+                watcher.RefreshDevice();
                 UpdateMicrophoneStatus();
             }
         }
@@ -115,9 +117,11 @@ namespace Muter
         // Updates the microphone status and UI.
         public void UpdateMicrophoneStatus()
         {
+            if (this.IsDisposed) return;
+
             if (this.InvokeRequired)
             {
-                this.Invoke(new Action(UpdateMicrophoneStatus));
+                this.BeginInvoke(new Action(UpdateMicrophoneStatus));
                 return;
             }
 
@@ -127,12 +131,12 @@ namespace Muter
                 UpdateUINoDevice();
         }
 
-        // Checks if a default capture device is available.
+        // Checks if the target capture device is available.
         private bool IsMicrophoneAvailable()
         {
             try
             {
-                microphone = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                microphone = watcher.CurrentDevice;
                 return microphone != null;
             }
             catch (COMException)
@@ -142,7 +146,18 @@ namespace Muter
         }
 
         // Handles audio device change events.
-        private void OnAudioDeviceChanged(object sender, EventArgs e) => UpdateMicrophoneStatus();
+        private void OnAudioDeviceChanged(object sender, EventArgs e)
+        {
+            if (this.IsDisposed) return;
+
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(UpdateMicrophoneStatus));
+                return;
+            }
+
+            UpdateMicrophoneStatus();
+        }
 
         #endregion
 
@@ -160,6 +175,10 @@ namespace Muter
                 toggleText.Text = isMuted ? "OFF" : "ON";
                 toggleText.Location = new Point(isMuted ? 44 : 46, 2);
                 notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
+
+                string devName = microphone.FriendlyName;
+                string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
+                notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
             }
             catch (COMException)
             {
@@ -174,6 +193,7 @@ namespace Muter
             notifyIcon1.Icon = noDeviceIcon;
             toggleText.Text = "No Device";
             toggleText.Location = new Point(24, 2);
+            notifyIcon1.Text = "Muter - No Device";
             RestartFadeOut();
         }
 
@@ -315,6 +335,83 @@ namespace Muter
         {
             UnregisterHotKey(this.Handle, HOTKEY_ID);
             watcher?.StopWatching();
+        }
+
+        // Populates the "Varsayılan Aygıt" submenu dynamically with current recording devices.
+        private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            PopulateDeviceMenu();
+        }
+
+        private void PopulateDeviceMenu()
+        {
+            defaultDeviceMenuItem.DropDownItems.Clear();
+
+            string currentSelectedId = Properties.Settings.Default.selectedDeviceId;
+
+            // 1. "Varsayılan (Sistem)" item
+            ToolStripMenuItem systemDefaultItem = new ToolStripMenuItem("Varsayılan (Sistem)");
+            systemDefaultItem.Checked = string.IsNullOrEmpty(currentSelectedId);
+            systemDefaultItem.Click += (s, ev) => SelectAudioDevice(null, "Varsayılan (Sistem)");
+            defaultDeviceMenuItem.DropDownItems.Add(systemDefaultItem);
+
+            defaultDeviceMenuItem.DropDownItems.Add(new ToolStripSeparator());
+
+            // 2. Active capture devices
+            bool selectedDeviceFound = false;
+            try
+            {
+                MMDeviceCollection endpoints = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                if (endpoints != null && endpoints.Count > 0)
+                {
+                    foreach (MMDevice endpoint in endpoints)
+                    {
+                        string id = endpoint.ID;
+                        string friendlyName = endpoint.FriendlyName;
+                        bool isCurrent = (!string.IsNullOrEmpty(currentSelectedId) && currentSelectedId == id);
+                        if (isCurrent) selectedDeviceFound = true;
+
+                        ToolStripMenuItem devItem = new ToolStripMenuItem(friendlyName);
+                        devItem.Checked = isCurrent;
+                        devItem.Click += (s, ev) => SelectAudioDevice(id, friendlyName);
+                        defaultDeviceMenuItem.DropDownItems.Add(devItem);
+                    }
+                }
+                else
+                {
+                    ToolStripMenuItem noDevicesItem = new ToolStripMenuItem("(Aktif aygıt bulunamadı)") { Enabled = false };
+                    defaultDeviceMenuItem.DropDownItems.Add(noDevicesItem);
+                }
+            }
+            catch
+            {
+                ToolStripMenuItem errorItem = new ToolStripMenuItem("(Aygıtlar listelenemedi)") { Enabled = false };
+                defaultDeviceMenuItem.DropDownItems.Add(errorItem);
+            }
+
+            // 3. If a specific device was previously chosen but is currently not connected
+            if (!string.IsNullOrEmpty(currentSelectedId) && !selectedDeviceFound)
+            {
+                string savedName = Properties.Settings.Default.selectedDeviceName;
+                string label = string.IsNullOrEmpty(savedName) ? "Aygıt" : savedName;
+                ToolStripMenuItem disconnectedItem = new ToolStripMenuItem($"{label} (Bağlı Değil)")
+                {
+                    Checked = true,
+                    Enabled = false
+                };
+                defaultDeviceMenuItem.DropDownItems.Add(disconnectedItem);
+            }
+        }
+
+        // Sets the audio capture device to be muted/unmuted.
+        private void SelectAudioDevice(string deviceId, string deviceName)
+        {
+            Properties.Settings.Default.selectedDeviceId = deviceId ?? string.Empty;
+            Properties.Settings.Default.selectedDeviceName = deviceName ?? string.Empty;
+            Properties.Settings.Default.Save();
+
+            watcher.SetTargetDevice(deviceId);
+            UpdateMicrophoneStatus();
         }
 
         #endregion

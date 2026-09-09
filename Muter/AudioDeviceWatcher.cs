@@ -1,37 +1,60 @@
-﻿using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using System;
 using System.Timers;
 
-// Monitors the default audio capture device for mute state changes.
-public class AudioDeviceWatcher
+// Monitors the audio capture device for mute state changes, device changes, and disconnections.
+public class AudioDeviceWatcher : IMMNotificationClient
 {
     #region Fields and Events
 
     private readonly MMDeviceEnumerator deviceEnumerator;
     private MMDevice device;
+    private string targetDeviceId;
     private bool lastMuteState;
     private readonly Timer debounceTimer;
+    private readonly object syncLock = new object();
+    private bool isWatching = false;
 
-    // Fired when the audio device's mute state has changed.
+    // Fired when the audio device's mute state or active device has changed.
     public event EventHandler AudioDeviceChanged;
+
+    public MMDevice CurrentDevice
+    {
+        get
+        {
+            lock (syncLock)
+            {
+                return device;
+            }
+        }
+    }
+
+    public string TargetDeviceId
+    {
+        get
+        {
+            lock (syncLock)
+            {
+                return targetDeviceId;
+            }
+        }
+    }
 
     #endregion
 
     #region Constructor
 
-    // Initializes the audio device watcher.
-    public AudioDeviceWatcher()
+    // Initializes the audio device watcher with default or specific device.
+    public AudioDeviceWatcher(string initialDeviceId = null)
     {
         deviceEnumerator = new MMDeviceEnumerator();
-        device = GetDefaultAudioDevice();
-
-        if (device != null)
-        {
-            lastMuteState = device.AudioEndpointVolume.Mute;
-        }
+        targetDeviceId = initialDeviceId;
 
         debounceTimer = new Timer(100) { AutoReset = false };
         debounceTimer.Elapsed += OnDebounceTimerElapsed;
+
+        RefreshDeviceInternal(fireEventIfChanged: false);
     }
 
     #endregion
@@ -41,49 +64,164 @@ public class AudioDeviceWatcher
     // Subscribes to device notifications to start monitoring.
     public void StartWatching()
     {
-        RefreshDevice();
-        device.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
+        lock (syncLock)
+        {
+            if (isWatching) return;
+            isWatching = true;
+
+            try
+            {
+                deviceEnumerator.RegisterEndpointNotificationCallback(this);
+            }
+            catch { }
+
+            RefreshDeviceInternal(fireEventIfChanged: true);
+        }
     }
 
     // Unsubscribes from device notifications to stop monitoring.
     public void StopWatching()
     {
-        device.AudioEndpointVolume.OnVolumeNotification -= VolumeNotification;
-        debounceTimer?.Stop();
+        lock (syncLock)
+        {
+            if (!isWatching) return;
+            isWatching = false;
+
+            try
+            {
+                deviceEnumerator.UnregisterEndpointNotificationCallback(this);
+            }
+            catch { }
+
+            UnsubscribeDevice(device);
+            device = null;
+            debounceTimer?.Stop();
+        }
     }
 
-    // Refreshes the audio device reference if the system's default device has changed.
+    // Switches the targeted audio device (null or empty string means system default).
+    public void SetTargetDevice(string deviceId)
+    {
+        lock (syncLock)
+        {
+            targetDeviceId = deviceId;
+            RefreshDeviceInternal(fireEventIfChanged: true);
+        }
+    }
+
+    // Refreshes the audio device reference.
     public void RefreshDevice()
     {
-        MMDevice newDevice = GetDefaultAudioDevice();
-
-        if (newDevice == null || (device != null && newDevice.ID == device.ID)) return;
-
-        if (device != null)
+        lock (syncLock)
         {
-            device.AudioEndpointVolume.OnVolumeNotification -= VolumeNotification;
+            RefreshDeviceInternal(fireEventIfChanged: true);
         }
-
-        device = newDevice;
-        device.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
-        lastMuteState = device.AudioEndpointVolume.Mute;
-        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
     }
 
     #endregion
 
     #region Private Methods & Event Handlers
 
-    // Safely gets the default audio capture device.
-    private MMDevice GetDefaultAudioDevice()
+    private void RefreshDeviceInternal(bool fireEventIfChanged)
     {
-        try
+        MMDevice newDevice = GetTargetAudioDevice();
+
+        bool isSame = (device == null && newDevice == null) ||
+                      (device != null && newDevice != null && device.ID == newDevice.ID);
+
+        if (isSame)
         {
-            return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+            if (device != null)
+            {
+                try
+                {
+                    bool currentMute = device.AudioEndpointVolume.Mute;
+                    if (currentMute != lastMuteState)
+                    {
+                        lastMuteState = currentMute;
+                        if (fireEventIfChanged)
+                        {
+                            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Device might have just disconnected
+                    UnsubscribeDevice(device);
+                    device = null;
+                    if (fireEventIfChanged)
+                    {
+                        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+            return;
         }
-        catch (Exception)
+
+        UnsubscribeDevice(device);
+        device = newDevice;
+
+        if (device != null)
         {
+            try
+            {
+                device.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
+                lastMuteState = device.AudioEndpointVolume.Mute;
+            }
+            catch
+            {
+                device = null;
+            }
+        }
+
+        if (fireEventIfChanged)
+        {
+            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    // Safely gets the target capture device (specified or default).
+    private MMDevice GetTargetAudioDevice()
+    {
+        if (string.IsNullOrEmpty(targetDeviceId))
+        {
+            try
+            {
+                return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        else
+        {
+            try
+            {
+                MMDevice specificDevice = deviceEnumerator.GetDevice(targetDeviceId);
+                if (specificDevice != null && specificDevice.State == DeviceState.Active)
+                {
+                    return specificDevice;
+                }
+            }
+            catch
+            {
+                // Device not found or disconnected
+            }
             return null;
+        }
+    }
+
+    private void UnsubscribeDevice(MMDevice dev)
+    {
+        if (dev != null)
+        {
+            try
+            {
+                dev.AudioEndpointVolume.OnVolumeNotification -= VolumeNotification;
+            }
+            catch { }
         }
     }
 
@@ -99,7 +237,57 @@ public class AudioDeviceWatcher
     }
 
     // Fires the AudioDeviceChanged event after the debounce delay.
-    private void OnDebounceTimerElapsed(object sender, ElapsedEventArgs e) => AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+    private void OnDebounceTimerElapsed(object sender, ElapsedEventArgs e)
+    {
+        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    #endregion
+
+    #region IMMNotificationClient Implementation
+
+    public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+    {
+        if (flow == DataFlow.Capture && role == Role.Communications)
+        {
+            lock (syncLock)
+            {
+                if (string.IsNullOrEmpty(targetDeviceId))
+                {
+                    RefreshDeviceInternal(fireEventIfChanged: true);
+                }
+            }
+        }
+    }
+
+    public void OnDeviceStateChanged(string deviceId, DeviceState newState)
+    {
+        lock (syncLock)
+        {
+            RefreshDeviceInternal(fireEventIfChanged: true);
+        }
+    }
+
+    public void OnDeviceAdded(string pwstrDeviceId)
+    {
+        lock (syncLock)
+        {
+            RefreshDeviceInternal(fireEventIfChanged: true);
+        }
+    }
+
+    public void OnDeviceRemoved(string deviceId)
+    {
+        lock (syncLock)
+        {
+            RefreshDeviceInternal(fireEventIfChanged: true);
+        }
+    }
+
+    public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
+    {
+        // Property changes don't require re-attaching
+    }
 
     #endregion
 }

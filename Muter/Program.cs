@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,6 +16,18 @@ namespace Muter
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
+            Application.ThreadException += (sender, args) =>
+            {
+                // Silently absorb COM / audio device disconnect exceptions to prevent annoying crash dialogs
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+            {
+                // Safety net for background threads
+            };
+
             Application.Run(new Form1());
         }
     }

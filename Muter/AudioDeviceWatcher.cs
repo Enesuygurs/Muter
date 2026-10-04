@@ -10,6 +10,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
     private readonly MMDeviceEnumerator deviceEnumerator;
     private MMDevice device;
+    private string currentDeviceId;
     private string targetDeviceId;
     private bool lastMuteState;
     private readonly Timer debounceTimer;
@@ -25,6 +26,12 @@ public class AudioDeviceWatcher : IMMNotificationClient
         {
             lock (syncLock)
             {
+                if (device != null && !IsDeviceAlive(device))
+                {
+                    UnsubscribeDevice(device);
+                    device = null;
+                    currentDeviceId = null;
+                }
                 return device;
             }
         }
@@ -95,6 +102,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
             UnsubscribeDevice(device);
             device = null;
+            currentDeviceId = null;
             debounceTimer?.Stop();
         }
     }
@@ -124,60 +132,86 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
     private void RefreshDeviceInternal(bool fireEventIfChanged)
     {
-        MMDevice newDevice = GetTargetAudioDevice();
-
-        bool isSame = (device == null && newDevice == null) ||
-                      (device != null && newDevice != null && device.ID == newDevice.ID);
-
-        if (isSame)
+        try
         {
-            if (device != null)
+            MMDevice newDevice = GetTargetAudioDevice();
+            string newId = SafeGetDeviceId(newDevice);
+
+            // If current device is disconnected or dead, clear it
+            if (device != null && (!IsDeviceAlive(device) || string.IsNullOrEmpty(currentDeviceId)))
             {
-                try
+                UnsubscribeDevice(device);
+                device = null;
+                currentDeviceId = null;
+            }
+
+            bool isSame = (device == null && newDevice == null) ||
+                          (device != null && newDevice != null && currentDeviceId != null && currentDeviceId == newId);
+
+            if (isSame)
+            {
+                if (device != null)
                 {
-                    bool currentMute = device.AudioEndpointVolume.Mute;
-                    if (currentMute != lastMuteState)
+                    try
                     {
-                        lastMuteState = currentMute;
+                        bool currentMute = device.AudioEndpointVolume.Mute;
+                        if (currentMute != lastMuteState)
+                        {
+                            lastMuteState = currentMute;
+                            if (fireEventIfChanged)
+                            {
+                                AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Device disconnected during mute query
+                        UnsubscribeDevice(device);
+                        device = null;
+                        currentDeviceId = null;
                         if (fireEventIfChanged)
                         {
                             AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
                         }
                     }
                 }
+                return;
+            }
+
+            UnsubscribeDevice(device);
+            device = newDevice;
+            currentDeviceId = newId;
+
+            if (device != null)
+            {
+                try
+                {
+                    device.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
+                    lastMuteState = device.AudioEndpointVolume.Mute;
+                }
                 catch
                 {
-                    // Device might have just disconnected
                     UnsubscribeDevice(device);
                     device = null;
-                    if (fireEventIfChanged)
-                    {
-                        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
-                    }
+                    currentDeviceId = null;
                 }
             }
-            return;
-        }
 
-        UnsubscribeDevice(device);
-        device = newDevice;
-
-        if (device != null)
-        {
-            try
+            if (fireEventIfChanged)
             {
-                device.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
-                lastMuteState = device.AudioEndpointVolume.Mute;
-            }
-            catch
-            {
-                device = null;
+                AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
             }
         }
-
-        if (fireEventIfChanged)
+        catch
         {
-            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+            UnsubscribeDevice(device);
+            device = null;
+            currentDeviceId = null;
+            if (fireEventIfChanged)
+            {
+                AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 
@@ -188,19 +222,24 @@ public class AudioDeviceWatcher : IMMNotificationClient
         {
             try
             {
-                return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                MMDevice defaultEndpoint = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                if (IsDeviceAlive(defaultEndpoint))
+                {
+                    return defaultEndpoint;
+                }
             }
             catch
             {
                 return null;
             }
+            return null;
         }
         else
         {
             try
             {
                 MMDevice specificDevice = deviceEnumerator.GetDevice(targetDeviceId);
-                if (specificDevice != null && specificDevice.State == DeviceState.Active)
+                if (IsDeviceAlive(specificDevice))
                 {
                     return specificDevice;
                 }
@@ -213,6 +252,32 @@ public class AudioDeviceWatcher : IMMNotificationClient
         }
     }
 
+    private static string SafeGetDeviceId(MMDevice dev)
+    {
+        if (dev == null) return null;
+        try
+        {
+            return dev.ID;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool IsDeviceAlive(MMDevice dev)
+    {
+        if (dev == null) return false;
+        try
+        {
+            return dev.State == DeviceState.Active;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void UnsubscribeDevice(MMDevice dev)
     {
         if (dev != null)
@@ -222,24 +287,37 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 dev.AudioEndpointVolume.OnVolumeNotification -= VolumeNotification;
             }
             catch { }
+            try
+            {
+                dev.Dispose();
+            }
+            catch { }
         }
     }
 
     // Handles volume/mute change notifications and triggers debouncing.
     private void VolumeNotification(AudioVolumeNotificationData data)
     {
-        if (data.Muted != lastMuteState)
+        try
         {
-            lastMuteState = data.Muted;
-            debounceTimer.Stop();
-            debounceTimer.Start();
+            if (data.Muted != lastMuteState)
+            {
+                lastMuteState = data.Muted;
+                debounceTimer.Stop();
+                debounceTimer.Start();
+            }
         }
+        catch { }
     }
 
     // Fires the AudioDeviceChanged event after the debounce delay.
     private void OnDebounceTimerElapsed(object sender, ElapsedEventArgs e)
     {
-        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch { }
     }
 
     #endregion
@@ -248,40 +326,56 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
     public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
-        if (flow == DataFlow.Capture && role == Role.Communications)
+        try
         {
-            lock (syncLock)
+            if (flow == DataFlow.Capture && role == Role.Communications)
             {
-                if (string.IsNullOrEmpty(targetDeviceId))
+                lock (syncLock)
                 {
-                    RefreshDeviceInternal(fireEventIfChanged: true);
+                    if (string.IsNullOrEmpty(targetDeviceId))
+                    {
+                        RefreshDeviceInternal(fireEventIfChanged: true);
+                    }
                 }
             }
         }
+        catch { }
     }
 
     public void OnDeviceStateChanged(string deviceId, DeviceState newState)
     {
-        lock (syncLock)
+        try
         {
-            RefreshDeviceInternal(fireEventIfChanged: true);
+            lock (syncLock)
+            {
+                RefreshDeviceInternal(fireEventIfChanged: true);
+            }
         }
+        catch { }
     }
 
     public void OnDeviceAdded(string pwstrDeviceId)
     {
-        lock (syncLock)
+        try
         {
-            RefreshDeviceInternal(fireEventIfChanged: true);
+            lock (syncLock)
+            {
+                RefreshDeviceInternal(fireEventIfChanged: true);
+            }
         }
+        catch { }
     }
 
     public void OnDeviceRemoved(string deviceId)
     {
-        lock (syncLock)
+        try
         {
-            RefreshDeviceInternal(fireEventIfChanged: true);
+            lock (syncLock)
+            {
+                RefreshDeviceInternal(fireEventIfChanged: true);
+            }
         }
+        catch { }
     }
 
     public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)

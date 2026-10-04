@@ -79,7 +79,7 @@ namespace Muter
             this.defaultDeviceMenuItem.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
             this.defaultDeviceMenuItem.Name = "defaultDeviceMenuItem";
             this.defaultDeviceMenuItem.Size = new System.Drawing.Size(160, 22);
-            this.defaultDeviceMenuItem.Text = "Varsayılan Aygıt";
+            this.defaultDeviceMenuItem.Text = "Default Device";
             // 
             // toolStripSeparator1
             // 

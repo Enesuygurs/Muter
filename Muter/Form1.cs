@@ -31,7 +31,6 @@ namespace Muter
         #region Fields and Properties
 
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
-        private MMDevice microphone;
         private bool isMuted = false;
         private bool isLoaded = false;
 
@@ -116,7 +115,7 @@ namespace Muter
 
             try
             {
-                microphone.AudioEndpointVolume.Mute = !microphone.AudioEndpointVolume.Mute;
+                watcher.ToggleMute();
                 UpdateUIForMuteState();
                 RestartFadeOut();
             }
@@ -148,17 +147,7 @@ namespace Muter
         // Checks if the target capture device is available.
         private bool IsMicrophoneAvailable()
         {
-            try
-            {
-                microphone = watcher.CurrentDevice;
-                if (microphone == null) return false;
-                return microphone.State == DeviceState.Active;
-            }
-            catch (Exception)
-            {
-                microphone = null;
-                return false;
-            }
+            return watcher != null && watcher.HasActiveDevices;
         }
 
         // Handles audio device change events.
@@ -182,23 +171,24 @@ namespace Muter
         // Updates the UI based on the current mute state.
         private void UpdateUIForMuteState()
         {
-            if (microphone == null) return;
+            if (!IsMicrophoneAvailable())
+            {
+                UpdateUINoDevice();
+                return;
+            }
 
             try
             {
                 bool previousMuted = isMuted;
-                isMuted = microphone.AudioEndpointVolume.Mute;
+                isMuted = watcher.IsMuted;
                 pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
                 toggleText.Text = isMuted ? "OFF" : "ON";
                 toggleText.Location = new Point(isMuted ? 44 : 46, 2);
                 notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
 
-                string devName = "Microphone";
-                try
-                {
-                    devName = microphone.FriendlyName;
-                }
-                catch { }
+                string devName = watcher.DeviceDisplayName;
+                title.Text = watcher.IsAllDevicesMode ? "All Devices" : "Microphone";
+                title.Location = new Point(Math.Max(0, (topBar.Width - title.Width) / 2), 2);
 
                 string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
                 notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
@@ -221,6 +211,8 @@ namespace Muter
             notifyIcon1.Icon = noDeviceIcon;
             toggleText.Text = "No Device";
             toggleText.Location = new Point(24, 2);
+            title.Text = (watcher != null && watcher.IsAllDevicesMode) ? "All Devices" : "Microphone";
+            title.Location = new Point(Math.Max(0, (topBar.Width - title.Width) / 2), 2);
             notifyIcon1.Text = "Muter - No Device";
             RestartFadeOut();
         }
@@ -389,7 +381,7 @@ namespace Muter
             }
         }
 
-        // Populates the "Default Device" submenu dynamically with current recording devices.
+        // Populates the "Devices" submenu dynamically with current recording devices.
         private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             showGuiMenuItem.Checked = Properties.Settings.Default.showGui;
@@ -408,10 +400,16 @@ namespace Muter
             systemDefaultItem.Click += (s, ev) => SelectAudioDevice(null, "Default (System)");
             defaultDeviceMenuItem.DropDownItems.Add(systemDefaultItem);
 
+            // 2. "All Devices" item
+            ToolStripMenuItem allDevicesItem = new ToolStripMenuItem("All Devices");
+            allDevicesItem.Checked = (currentSelectedId == AudioDeviceWatcher.ALL_DEVICES_ID);
+            allDevicesItem.Click += (s, ev) => SelectAudioDevice(AudioDeviceWatcher.ALL_DEVICES_ID, "All Devices");
+            defaultDeviceMenuItem.DropDownItems.Add(allDevicesItem);
+
             defaultDeviceMenuItem.DropDownItems.Add(new ToolStripSeparator());
 
-            // 2. Active capture devices
-            bool selectedDeviceFound = false;
+            // 3. Active capture devices
+            bool selectedDeviceFound = (string.IsNullOrEmpty(currentSelectedId) || currentSelectedId == AudioDeviceWatcher.ALL_DEVICES_ID);
             try
             {
                 MMDeviceCollection endpoints = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
@@ -449,7 +447,7 @@ namespace Muter
                 defaultDeviceMenuItem.DropDownItems.Add(errorItem);
             }
 
-            // 3. If a specific device was previously chosen but is currently not connected
+            // 4. If a specific device was previously chosen but is currently not connected
             if (!string.IsNullOrEmpty(currentSelectedId) && !selectedDeviceFound)
             {
                 string savedName = Properties.Settings.Default.selectedDeviceName;

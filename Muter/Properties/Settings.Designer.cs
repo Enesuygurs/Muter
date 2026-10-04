@@ -58,5 +58,17 @@ namespace Muter.Properties {
                 this["selectedDeviceName"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool showGui {
+            get {
+                return ((bool)(this["showGui"]));
+            }
+            set {
+                this["showGui"] = value;
+            }
+        }
     }
 }

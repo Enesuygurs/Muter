@@ -33,6 +33,7 @@ namespace Muter
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
         private MMDevice microphone;
         private bool isMuted = false;
+        private bool isLoaded = false;
 
         private readonly AudioDeviceWatcher watcher;
 
@@ -52,6 +53,11 @@ namespace Muter
         public Form1()
         {
             InitializeComponent();
+            if (!Properties.Settings.Default.showGui)
+            {
+                this.Opacity = 0;
+                fadeOutTimer.Stop();
+            }
             string savedDeviceId = Properties.Settings.Default.selectedDeviceId;
             watcher = new AudioDeviceWatcher(savedDeviceId);
             watcher.AudioDeviceChanged += OnAudioDeviceChanged;
@@ -65,7 +71,15 @@ namespace Muter
             CenterOverlay();
             LoadShortcutFromSettings();
             CheckAndToggleStartupStatus(isToggle: false);
+            showGuiMenuItem.Checked = Properties.Settings.Default.showGui;
+            if (!Properties.Settings.Default.showGui)
+            {
+                this.Opacity = 0;
+                this.Hide();
+                fadeOutTimer.Stop();
+            }
             UpdateMicrophoneStatus();
+            isLoaded = true;
         }
 
         // Prevents the form from gaining focus when shown.
@@ -170,6 +184,7 @@ namespace Muter
 
             try
             {
+                bool previousMuted = isMuted;
                 isMuted = microphone.AudioEndpointVolume.Mute;
                 pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
                 toggleText.Text = isMuted ? "OFF" : "ON";
@@ -179,6 +194,11 @@ namespace Muter
                 string devName = microphone.FriendlyName;
                 string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
                 notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
+
+                if (isLoaded && previousMuted != isMuted)
+                {
+                    RestartFadeOut();
+                }
             }
             catch (COMException)
             {
@@ -200,6 +220,14 @@ namespace Muter
         // Restarts the fade-out animation for the overlay.
         private void RestartFadeOut()
         {
+            if (!Properties.Settings.Default.showGui)
+            {
+                this.Opacity = 0;
+                this.Hide();
+                fadeOutTimer.Stop();
+                return;
+            }
+
             this.Opacity = 1;
             this.Show();
             fadeOutTimer.Stop();
@@ -337,9 +365,26 @@ namespace Muter
             watcher?.StopWatching();
         }
 
+        // Handles the click event for the "Show GUI" menu item.
+        private void showGuiMenuItem_Click(object sender, EventArgs e)
+        {
+            bool newStatus = !Properties.Settings.Default.showGui;
+            Properties.Settings.Default.showGui = newStatus;
+            Properties.Settings.Default.Save();
+            showGuiMenuItem.Checked = newStatus;
+
+            if (!newStatus)
+            {
+                this.Opacity = 0;
+                this.Hide();
+                fadeOutTimer.Stop();
+            }
+        }
+
         // Populates the "Varsayılan Aygıt" submenu dynamically with current recording devices.
         private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            showGuiMenuItem.Checked = Properties.Settings.Default.showGui;
             PopulateDeviceMenu();
         }
 

@@ -120,7 +120,7 @@ namespace Muter
                 UpdateUIForMuteState();
                 RestartFadeOut();
             }
-            catch (COMException)
+            catch (Exception)
             {
                 // Device was removed or changed mid-operation; refresh status.
                 watcher.RefreshDevice();
@@ -151,10 +151,12 @@ namespace Muter
             try
             {
                 microphone = watcher.CurrentDevice;
-                return microphone != null;
+                if (microphone == null) return false;
+                return microphone.State == DeviceState.Active;
             }
-            catch (COMException)
+            catch (Exception)
             {
+                microphone = null;
                 return false;
             }
         }
@@ -191,7 +193,13 @@ namespace Muter
                 toggleText.Location = new Point(isMuted ? 44 : 46, 2);
                 notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
 
-                string devName = microphone.FriendlyName;
+                string devName = "Microphone";
+                try
+                {
+                    devName = microphone.FriendlyName;
+                }
+                catch { }
+
                 string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
                 notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
 
@@ -200,7 +208,7 @@ namespace Muter
                     RestartFadeOut();
                 }
             }
-            catch (COMException)
+            catch (Exception)
             {
                 UpdateUINoDevice();
             }
@@ -411,15 +419,22 @@ namespace Muter
                 {
                     foreach (MMDevice endpoint in endpoints)
                     {
-                        string id = endpoint.ID;
-                        string friendlyName = endpoint.FriendlyName;
-                        bool isCurrent = (!string.IsNullOrEmpty(currentSelectedId) && currentSelectedId == id);
-                        if (isCurrent) selectedDeviceFound = true;
+                        try
+                        {
+                            string id = endpoint.ID;
+                            string friendlyName = endpoint.FriendlyName;
+                            bool isCurrent = (!string.IsNullOrEmpty(currentSelectedId) && currentSelectedId == id);
+                            if (isCurrent) selectedDeviceFound = true;
 
-                        ToolStripMenuItem devItem = new ToolStripMenuItem(friendlyName);
-                        devItem.Checked = isCurrent;
-                        devItem.Click += (s, ev) => SelectAudioDevice(id, friendlyName);
-                        defaultDeviceMenuItem.DropDownItems.Add(devItem);
+                            ToolStripMenuItem devItem = new ToolStripMenuItem(friendlyName);
+                            devItem.Checked = isCurrent;
+                            devItem.Click += (s, ev) => SelectAudioDevice(id, friendlyName);
+                            defaultDeviceMenuItem.DropDownItems.Add(devItem);
+                        }
+                        catch
+                        {
+                            // Skip any device that was disconnected during enumeration
+                        }
                     }
                 }
                 else
@@ -451,12 +466,19 @@ namespace Muter
         // Sets the audio capture device to be muted/unmuted.
         private void SelectAudioDevice(string deviceId, string deviceName)
         {
-            Properties.Settings.Default.selectedDeviceId = deviceId ?? string.Empty;
-            Properties.Settings.Default.selectedDeviceName = deviceName ?? string.Empty;
-            Properties.Settings.Default.Save();
+            try
+            {
+                Properties.Settings.Default.selectedDeviceId = deviceId ?? string.Empty;
+                Properties.Settings.Default.selectedDeviceName = deviceName ?? string.Empty;
+                Properties.Settings.Default.Save();
 
-            watcher.SetTargetDevice(deviceId);
-            UpdateMicrophoneStatus();
+                watcher.SetTargetDevice(deviceId);
+                UpdateMicrophoneStatus();
+            }
+            catch (Exception)
+            {
+                UpdateUINoDevice();
+            }
         }
 
         #endregion

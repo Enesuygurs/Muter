@@ -389,7 +389,7 @@ namespace Muter
             }
         }
 
-        // Populates the "Varsayılan Aygıt" submenu dynamically with current recording devices.
+        // Populates the "Default Device" submenu dynamically with current recording devices.
         private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             showGuiMenuItem.Checked = Properties.Settings.Default.showGui;
@@ -402,10 +402,10 @@ namespace Muter
 
             string currentSelectedId = Properties.Settings.Default.selectedDeviceId;
 
-            // 1. "Varsayılan (Sistem)" item
-            ToolStripMenuItem systemDefaultItem = new ToolStripMenuItem("Varsayılan (Sistem)");
+            // 1. "Default (System)" item
+            ToolStripMenuItem systemDefaultItem = new ToolStripMenuItem("Default (System)");
             systemDefaultItem.Checked = string.IsNullOrEmpty(currentSelectedId);
-            systemDefaultItem.Click += (s, ev) => SelectAudioDevice(null, "Varsayılan (Sistem)");
+            systemDefaultItem.Click += (s, ev) => SelectAudioDevice(null, "Default (System)");
             defaultDeviceMenuItem.DropDownItems.Add(systemDefaultItem);
 
             defaultDeviceMenuItem.DropDownItems.Add(new ToolStripSeparator());
@@ -439,13 +439,13 @@ namespace Muter
                 }
                 else
                 {
-                    ToolStripMenuItem noDevicesItem = new ToolStripMenuItem("(Aktif aygıt bulunamadı)") { Enabled = false };
+                    ToolStripMenuItem noDevicesItem = new ToolStripMenuItem("(No active devices found)") { Enabled = false };
                     defaultDeviceMenuItem.DropDownItems.Add(noDevicesItem);
                 }
             }
             catch
             {
-                ToolStripMenuItem errorItem = new ToolStripMenuItem("(Aygıtlar listelenemedi)") { Enabled = false };
+                ToolStripMenuItem errorItem = new ToolStripMenuItem("(Failed to list devices)") { Enabled = false };
                 defaultDeviceMenuItem.DropDownItems.Add(errorItem);
             }
 
@@ -453,8 +453,8 @@ namespace Muter
             if (!string.IsNullOrEmpty(currentSelectedId) && !selectedDeviceFound)
             {
                 string savedName = Properties.Settings.Default.selectedDeviceName;
-                string label = string.IsNullOrEmpty(savedName) ? "Aygıt" : savedName;
-                ToolStripMenuItem disconnectedItem = new ToolStripMenuItem($"{label} (Bağlı Değil)")
+                string label = string.IsNullOrEmpty(savedName) ? "Device" : savedName;
+                ToolStripMenuItem disconnectedItem = new ToolStripMenuItem($"{label} (Disconnected)")
                 {
                     Checked = true,
                     Enabled = false

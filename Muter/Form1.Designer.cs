@@ -34,6 +34,7 @@ namespace Muter
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.defaultDeviceMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.showGuiMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.runStartup = new System.Windows.Forms.ToolStripMenuItem();
             this.hotkeyForm = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
@@ -64,12 +65,13 @@ namespace Muter
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.defaultDeviceMenuItem,
             this.toolStripSeparator1,
+            this.showGuiMenuItem,
             this.runStartup,
             this.hotkeyForm,
             this.toolStripSeparator2,
             this.exitToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(161, 104);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(161, 126);
             this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
             // 
             // defaultDeviceMenuItem
@@ -83,6 +85,14 @@ namespace Muter
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
             this.toolStripSeparator1.Size = new System.Drawing.Size(157, 6);
+            // 
+            // showGuiMenuItem
+            // 
+            this.showGuiMenuItem.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
+            this.showGuiMenuItem.Name = "showGuiMenuItem";
+            this.showGuiMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.showGuiMenuItem.Text = "Show GUI";
+            this.showGuiMenuItem.Click += new System.EventHandler(this.showGuiMenuItem_Click);
             // 
             // toolStripSeparator2
             // 
@@ -208,6 +218,7 @@ namespace Muter
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem hotkeyForm;
         private System.Windows.Forms.ToolStripMenuItem defaultDeviceMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem showGuiMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.Timer fadeOutTimer;

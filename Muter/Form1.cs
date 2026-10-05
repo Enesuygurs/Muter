@@ -30,11 +30,20 @@ namespace Muter
 
         #region Fields and Properties
 
-        private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+        private MMDeviceEnumerator deviceEnumerator;
         private bool isMuted = false;
         private bool isLoaded = false;
 
         private readonly AudioDeviceWatcher watcher;
+
+        private MMDeviceEnumerator GetDeviceEnumerator()
+        {
+            if (deviceEnumerator == null)
+            {
+                try { deviceEnumerator = new MMDeviceEnumerator(); } catch { }
+            }
+            return deviceEnumerator;
+        }
 
         // UI Resources
         private readonly Bitmap mutedBackground = Properties.Resources.muteroffwhite;
@@ -77,8 +86,30 @@ namespace Muter
                 this.Hide();
                 fadeOutTimer.Stop();
             }
+
+            watcher.RefreshDevice();
             UpdateMicrophoneStatus();
+
+            // Start periodic microphone checker to automatically detect devices after boot/sleep/hotplug
+            microphoneChecker.Interval = 1500;
+            microphoneChecker.Tick += MicrophoneChecker_Tick;
+            microphoneChecker.Start();
+
             isLoaded = true;
+        }
+
+        // Periodically checks if audio devices have become available (especially after system boot or sleep).
+        private void MicrophoneChecker_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsMicrophoneAvailable())
+                {
+                    watcher.RefreshDevice();
+                    UpdateMicrophoneStatus();
+                }
+            }
+            catch { }
         }
 
         // Prevents the form from gaining focus when shown.
@@ -109,21 +140,31 @@ namespace Muter
         {
             if (!IsMicrophoneAvailable())
             {
-                UpdateUINoDevice();
-                return;
+                watcher.RefreshDevice();
+                if (!IsMicrophoneAvailable())
+                {
+                    UpdateUINoDevice();
+                    return;
+                }
             }
 
             try
             {
-                watcher.ToggleMute();
-                UpdateUIForMuteState();
+                bool newMuteState = watcher.ToggleMute();
+                ApplyMuteStateToUI(newMuteState);
                 RestartFadeOut();
             }
-            catch (Exception)
+            catch
             {
-                // Device was removed or changed mid-operation; refresh status.
-                watcher.RefreshDevice();
-                UpdateMicrophoneStatus();
+                if (IsMicrophoneAvailable())
+                {
+                    ApplyMuteStateToUI(watcher.IsMuted);
+                    RestartFadeOut();
+                }
+                else
+                {
+                    UpdateUINoDevice();
+                }
             }
         }
 
@@ -168,6 +209,23 @@ namespace Muter
 
         #region UI Update Logic
 
+        // Applies mute state directly to UI elements without delay.
+        private void ApplyMuteStateToUI(bool muted)
+        {
+            isMuted = muted;
+            pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
+            toggleText.Text = isMuted ? "OFF" : "ON";
+            toggleText.Location = new Point(isMuted ? 44 : 46, 2);
+            notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
+
+            string devName = watcher.DeviceDisplayName;
+            title.Text = watcher.IsAllDevicesMode ? "All Devices" : "Microphone";
+            title.Location = new Point(Math.Max(0, (topBar.Width - title.Width) / 2), 2);
+
+            string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
+            notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
+        }
+
         // Updates the UI based on the current mute state.
         private void UpdateUIForMuteState()
         {
@@ -180,27 +238,17 @@ namespace Muter
             try
             {
                 bool previousMuted = isMuted;
-                isMuted = watcher.IsMuted;
-                pictureBox1.BackgroundImage = isMuted ? mutedBackground : openedBackground;
-                toggleText.Text = isMuted ? "OFF" : "ON";
-                toggleText.Location = new Point(isMuted ? 44 : 46, 2);
-                notifyIcon1.Icon = isMuted ? muteIcon : openIcon;
+                bool currentMuted = watcher.IsMuted;
+                ApplyMuteStateToUI(currentMuted);
 
-                string devName = watcher.DeviceDisplayName;
-                title.Text = watcher.IsAllDevicesMode ? "All Devices" : "Microphone";
-                title.Location = new Point(Math.Max(0, (topBar.Width - title.Width) / 2), 2);
-
-                string tip = $"Muter - {devName} ({(isMuted ? "OFF" : "ON")})";
-                notifyIcon1.Text = tip.Length > 63 ? tip.Substring(0, 60) + "..." : tip;
-
-                if (isLoaded && previousMuted != isMuted)
+                if (isLoaded && previousMuted != currentMuted)
                 {
                     RestartFadeOut();
                 }
             }
-            catch (Exception)
+            catch
             {
-                UpdateUINoDevice();
+                // Never wipe UI state to No Device if microphone is available!
             }
         }
 
@@ -361,8 +409,10 @@ namespace Muter
         // Unregisters hotkey and stops the device watcher when the form is closing.
         private void Form1_FormClosing_1(object sender, FormClosingEventArgs e)
         {
+            microphoneChecker?.Stop();
             UnregisterHotKey(this.Handle, HOTKEY_ID);
             watcher?.StopWatching();
+            try { deviceEnumerator?.Dispose(); } catch { }
         }
 
         // Handles the click event for the "Show GUI" menu item.
@@ -412,13 +462,30 @@ namespace Muter
             bool selectedDeviceFound = (string.IsNullOrEmpty(currentSelectedId) || currentSelectedId == AudioDeviceWatcher.ALL_DEVICES_ID);
             try
             {
-                MMDeviceCollection endpoints = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                var enumerator = GetDeviceEnumerator();
+                MMDeviceCollection endpoints = null;
+                try
+                {
+                    endpoints = enumerator?.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                }
+                catch
+                {
+                    try
+                    {
+                        deviceEnumerator = new MMDeviceEnumerator();
+                        endpoints = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                    }
+                    catch { }
+                }
+
                 if (endpoints != null && endpoints.Count > 0)
                 {
-                    foreach (MMDevice endpoint in endpoints)
+                    for (int i = 0; i < endpoints.Count; i++)
                     {
+                        MMDevice endpoint = null;
                         try
                         {
+                            endpoint = endpoints[i];
                             string id = endpoint.ID;
                             string friendlyName = endpoint.FriendlyName;
                             bool isCurrent = (!string.IsNullOrEmpty(currentSelectedId) && currentSelectedId == id);
@@ -432,6 +499,10 @@ namespace Muter
                         catch
                         {
                             // Skip any device that was disconnected during enumeration
+                        }
+                        finally
+                        {
+                            try { endpoint?.Dispose(); } catch { }
                         }
                     }
                 }

@@ -33,6 +33,7 @@ namespace Muter
             this.notifyIcon1 = new System.Windows.Forms.NotifyIcon(this.components);
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.defaultDeviceMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.syncDevicesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.showGuiMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.runStartup = new System.Windows.Forms.ToolStripMenuItem();
@@ -64,6 +65,7 @@ namespace Muter
             // 
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.defaultDeviceMenuItem,
+            this.syncDevicesMenuItem,
             this.toolStripSeparator1,
             this.showGuiMenuItem,
             this.runStartup,
@@ -71,7 +73,7 @@ namespace Muter
             this.toolStripSeparator2,
             this.exitToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(161, 126);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(161, 148);
             this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
             // 
             // defaultDeviceMenuItem
@@ -80,6 +82,14 @@ namespace Muter
             this.defaultDeviceMenuItem.Name = "defaultDeviceMenuItem";
             this.defaultDeviceMenuItem.Size = new System.Drawing.Size(160, 22);
             this.defaultDeviceMenuItem.Text = "Devices";
+            // 
+            // syncDevicesMenuItem
+            // 
+            this.syncDevicesMenuItem.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
+            this.syncDevicesMenuItem.Name = "syncDevicesMenuItem";
+            this.syncDevicesMenuItem.Size = new System.Drawing.Size(160, 22);
+            this.syncDevicesMenuItem.Text = "Sync Devices";
+            this.syncDevicesMenuItem.Click += new System.EventHandler(this.syncDevicesMenuItem_Click);
             // 
             // toolStripSeparator1
             // 
@@ -218,6 +228,7 @@ namespace Muter
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem hotkeyForm;
         private System.Windows.Forms.ToolStripMenuItem defaultDeviceMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem syncDevicesMenuItem;
         private System.Windows.Forms.ToolStripMenuItem showGuiMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;

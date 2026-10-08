@@ -67,7 +67,8 @@ namespace Muter
                 fadeOutTimer.Stop();
             }
             string savedDeviceId = Properties.Settings.Default.selectedDeviceId;
-            watcher = new AudioDeviceWatcher(savedDeviceId);
+            bool savedSync = Properties.Settings.Default.syncDevices;
+            watcher = new AudioDeviceWatcher(savedDeviceId, savedSync);
             watcher.AudioDeviceChanged += OnAudioDeviceChanged;
             watcher.StartWatching();
             notifyIcon1.MouseClick += new MouseEventHandler(notifyIcon1_MouseClick);
@@ -87,6 +88,10 @@ namespace Muter
                 fadeOutTimer.Stop();
             }
 
+            if (watcher.IsAllDevicesMode && Properties.Settings.Default.syncDevices && watcher.AreDevicesInMixedState())
+            {
+                watcher.SyncAllDevices();
+            }
             watcher.RefreshDevice();
             UpdateMicrophoneStatus();
 
@@ -108,6 +113,17 @@ namespace Muter
                     watcher.RefreshDevice();
                     UpdateMicrophoneStatus();
                     return;
+                }
+
+                // If in All Devices mode and sync is enabled, enforce that devices never remain in mixed states
+                if (watcher.IsAllDevicesMode && Properties.Settings.Default.syncDevices)
+                {
+                    if (watcher.AreDevicesInMixedState())
+                    {
+                        watcher.SyncAllDevices();
+                        UpdateMicrophoneStatus();
+                        return;
+                    }
                 }
 
                 bool realMuted = watcher.IsMuted;
@@ -442,7 +458,30 @@ namespace Muter
         private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             showGuiMenuItem.Checked = Properties.Settings.Default.showGui;
+            syncDevicesMenuItem.Checked = watcher.IsAllDevicesMode && Properties.Settings.Default.syncDevices;
             PopulateDeviceMenu();
+        }
+
+        // Synchronizes all recording devices to the same mute state.
+        private void syncDevicesMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!watcher.IsAllDevicesMode)
+                {
+                    SelectAudioDevice(AudioDeviceWatcher.ALL_DEVICES_ID, "All Devices");
+                }
+
+                Properties.Settings.Default.syncDevices = true;
+                Properties.Settings.Default.Save();
+                watcher.SyncDevicesEnabled = true;
+                syncDevicesMenuItem.Checked = true;
+
+                bool newMuteState = watcher.SyncAllDevices();
+                ApplyMuteStateToUI(newMuteState);
+                RestartFadeOut();
+            }
+            catch { }
         }
 
         private void PopulateDeviceMenu()
@@ -549,6 +588,12 @@ namespace Muter
                 Properties.Settings.Default.Save();
 
                 watcher.SetTargetDevice(deviceId);
+
+                if (watcher.IsAllDevicesMode && Properties.Settings.Default.syncDevices)
+                {
+                    watcher.SyncAllDevices();
+                }
+
                 UpdateMicrophoneStatus();
             }
             catch (Exception)

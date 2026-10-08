@@ -203,13 +203,36 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
     #endregion
 
+    private readonly Dictionary<string, bool> deviceMuteCache = new Dictionary<string, bool>();
+    private bool syncDevicesEnabled = true;
+
+    // Controls whether all devices are automatically synchronized to the same mute state.
+    public bool SyncDevicesEnabled
+    {
+        get
+        {
+            lock (syncLock)
+            {
+                return syncDevicesEnabled;
+            }
+        }
+        set
+        {
+            lock (syncLock)
+            {
+                syncDevicesEnabled = value;
+            }
+        }
+    }
+
     #region Constructor
 
     // Initializes the audio device watcher with default or specific device.
-    public AudioDeviceWatcher(string initialDeviceId = null)
+    public AudioDeviceWatcher(string initialDeviceId = null, bool initialSyncDevices = true)
     {
         deviceEnumerator = new MMDeviceEnumerator();
         targetDeviceId = initialDeviceId;
+        syncDevicesEnabled = initialSyncDevices;
 
         debounceTimer = new Timer(150) { AutoReset = false };
         debounceTimer.Elapsed += OnDebounceTimerElapsed;
@@ -395,6 +418,143 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 bool actualMute = IsMuted;
                 lastMuteState = actualMute;
                 return actualMute;
+            }
+        }
+    }
+
+    // Checks if capture devices are currently in different mute states.
+    public bool AreDevicesInMixedState()
+    {
+        lock (syncLock)
+        {
+            return AreDevicesInMixedStateInternal();
+        }
+    }
+
+    private bool AreDevicesInMixedStateInternal()
+    {
+        if (targetDeviceId != ALL_DEVICES_ID || allDevices.Count <= 1)
+            return false;
+
+        bool hasMuted = false;
+        bool hasUnmuted = false;
+
+        foreach (var d in allDevices)
+        {
+            if (IsDeviceAlive(d))
+            {
+                try
+                {
+                    if (d.AudioEndpointVolume.Mute)
+                        hasMuted = true;
+                    else
+                        hasUnmuted = true;
+
+                    if (hasMuted && hasUnmuted)
+                        return true;
+                }
+                catch { }
+            }
+        }
+
+        return hasMuted && hasUnmuted;
+    }
+
+    // Synchronizes all active capture devices to have the exact same mute state.
+    public bool SyncAllDevices(bool? forceTargetMute = null)
+    {
+        lock (syncLock)
+        {
+            if (allDevices.Count == 0)
+            {
+                RefreshAllDevicesInternal(fireEventIfChanged: false);
+            }
+
+            if (allDevices.Count == 0) return lastMuteState;
+
+            bool targetMute;
+            if (forceTargetMute.HasValue)
+            {
+                targetMute = forceTargetMute.Value;
+            }
+            else
+            {
+                // Align with the system default recording device (Role.Console)
+                MMDevice defaultEp = null;
+                try
+                {
+                    if (deviceEnumerator == null) deviceEnumerator = new MMDeviceEnumerator();
+                    defaultEp = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
+                }
+                catch { }
+
+                if (defaultEp != null && IsDeviceAlive(defaultEp))
+                {
+                    try
+                    {
+                        targetMute = defaultEp.AudioEndpointVolume.Mute;
+                    }
+                    catch
+                    {
+                        targetMute = IsMuted;
+                    }
+                    try { defaultEp.Dispose(); } catch { }
+                }
+                else
+                {
+                    targetMute = IsMuted;
+                }
+            }
+
+            foreach (var d in allDevices)
+            {
+                try
+                {
+                    if (IsDeviceAlive(d))
+                    {
+                        if (d.AudioEndpointVolume.Mute != targetMute)
+                        {
+                            d.AudioEndpointVolume.Mute = targetMute;
+                        }
+                    }
+                }
+                catch
+                {
+                    try
+                    {
+                        string id = SafeGetDeviceId(d);
+                        if (!string.IsNullOrEmpty(id) && deviceEnumerator != null)
+                        {
+                            using (var fresh = deviceEnumerator.GetDevice(id))
+                            {
+                                fresh.AudioEndpointVolume.Mute = targetMute;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            UpdateDeviceMuteCache();
+
+            bool actualMute = IsMuted;
+            lastMuteState = actualMute;
+            return actualMute;
+        }
+    }
+
+    private void UpdateDeviceMuteCache()
+    {
+        foreach (var d in allDevices)
+        {
+            string id = SafeGetDeviceId(d);
+            if (!string.IsNullOrEmpty(id) && IsDeviceAlive(d))
+            {
+                try
+                {
+                    deviceMuteCache[id] = d.AudioEndpointVolume.Mute;
+                }
+                catch { }
             }
         }
     }
@@ -624,6 +784,13 @@ public class AudioDeviceWatcher : IMMNotificationClient
         allDevices.Clear();
         allDevices.AddRange(updatedDevices);
 
+        UpdateDeviceMuteCache();
+
+        if (syncDevicesEnabled && AreDevicesInMixedStateInternal())
+        {
+            SyncAllDevices();
+        }
+
         bool currentMute = IsMuted;
         if (listChanged || currentMute != lastMuteState)
         {
@@ -828,6 +995,49 @@ public class AudioDeviceWatcher : IMMNotificationClient
         {
             lock (syncLock)
             {
+                if (targetDeviceId == ALL_DEVICES_ID && syncDevicesEnabled)
+                {
+                    string changedDeviceId = null;
+                    bool newMuteStateForChanged = false;
+
+                    foreach (var d in allDevices)
+                    {
+                        string id = SafeGetDeviceId(d);
+                        if (!string.IsNullOrEmpty(id) && IsDeviceAlive(d))
+                        {
+                            try
+                            {
+                                bool currentDevMute = d.AudioEndpointVolume.Mute;
+                                if (deviceMuteCache.TryGetValue(id, out bool cachedMute))
+                                {
+                                    if (currentDevMute != cachedMute)
+                                    {
+                                        changedDeviceId = id;
+                                        newMuteStateForChanged = currentDevMute;
+                                        break;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (changedDeviceId != null)
+                    {
+                        SyncAllDevices(newMuteStateForChanged);
+                        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+                        return;
+                    }
+                    else if (AreDevicesInMixedStateInternal())
+                    {
+                        SyncAllDevices();
+                        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+                        return;
+                    }
+                }
+
+                UpdateDeviceMuteCache();
+
                 bool currentMute = IsMuted;
                 if (currentMute != lastMuteState)
                 {

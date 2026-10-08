@@ -68,9 +68,17 @@ public class AudioDeviceWatcher : IMMNotificationClient
             {
                 if (targetDeviceId == ALL_DEVICES_ID)
                 {
-                    return allDevices.Count > 0;
+                    if (allDevices.Count == 0) return false;
+                    for (int i = 0; i < allDevices.Count; i++)
+                    {
+                        if (IsDeviceAlive(allDevices[i])) return true;
+                    }
+                    return false;
                 }
-                return device != null;
+                else
+                {
+                    return device != null && IsDeviceAlive(device);
+                }
             }
         }
     }
@@ -84,26 +92,87 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 if (targetDeviceId == ALL_DEVICES_ID)
                 {
                     if (allDevices.Count == 0) return false;
-                    foreach (var d in allDevices)
+
+                    int activeCount = 0;
+                    int mutedCount = 0;
+                    int failedCount = 0;
+
+                    for (int i = 0; i < allDevices.Count; i++)
                     {
+                        var d = allDevices[i];
+                        if (d == null) continue;
+
                         try
                         {
-                            if (IsDeviceAlive(d) && !d.AudioEndpointVolume.Mute) return false;
+                            if (!IsDeviceAlive(d)) continue;
+
+                            bool isDevMuted;
+                            try
+                            {
+                                isDevMuted = d.AudioEndpointVolume.Mute;
+                            }
+                            catch
+                            {
+                                string id = SafeGetDeviceId(d);
+                                if (!string.IsNullOrEmpty(id) && deviceEnumerator != null)
+                                {
+                                    using (var fresh = deviceEnumerator.GetDevice(id))
+                                    {
+                                        isDevMuted = fresh.AudioEndpointVolume.Mute;
+                                    }
+                                }
+                                else
+                                {
+                                    throw;
+                                }
+                            }
+
+                            activeCount++;
+
+                            if (!isDevMuted)
+                            {
+                                // At least one microphone is live / unmuted.
+                                return false;
+                            }
+                            else
+                            {
+                                mutedCount++;
+                            }
                         }
-                        catch { }
+                        catch
+                        {
+                            failedCount++;
+                        }
                     }
-                    return true;
+
+                    // Only return true (muted) if every active microphone was verified and is muted!
+                    return activeCount > 0 && mutedCount == activeCount && failedCount == 0;
                 }
                 else
                 {
                     try
                     {
-                        return device != null && IsDeviceAlive(device) && device.AudioEndpointVolume.Mute;
+                        if (device != null && IsDeviceAlive(device))
+                        {
+                            try
+                            {
+                                return device.AudioEndpointVolume.Mute;
+                            }
+                            catch
+                            {
+                                string id = SafeGetDeviceId(device);
+                                if (!string.IsNullOrEmpty(id) && deviceEnumerator != null)
+                                {
+                                    using (var fresh = deviceEnumerator.GetDevice(id))
+                                    {
+                                        return fresh.AudioEndpointVolume.Mute;
+                                    }
+                                }
+                            }
+                        }
                     }
-                    catch
-                    {
-                        return false;
-                    }
+                    catch { }
+                    return false;
                 }
             }
         }
@@ -250,7 +319,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 {
                     try
                     {
-                        if (!d.AudioEndpointVolume.Mute)
+                        if (IsDeviceAlive(d) && !d.AudioEndpointVolume.Mute)
                         {
                             anyUnmuted = true;
                             break;
@@ -264,32 +333,68 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 {
                     try
                     {
-                        d.AudioEndpointVolume.Mute = targetMute;
+                        if (IsDeviceAlive(d))
+                        {
+                            d.AudioEndpointVolume.Mute = targetMute;
+                        }
                     }
-                    catch { }
+                    catch
+                    {
+                        try
+                        {
+                            string id = SafeGetDeviceId(d);
+                            if (!string.IsNullOrEmpty(id) && deviceEnumerator != null)
+                            {
+                                using (var fresh = deviceEnumerator.GetDevice(id))
+                                {
+                                    fresh.AudioEndpointVolume.Mute = targetMute;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
-                lastMuteState = targetMute;
-                return targetMute;
+
+                // Verify and return real hardware state
+                bool actualMute = IsMuted;
+                lastMuteState = actualMute;
+                return actualMute;
             }
             else
             {
-                if (device == null)
+                if (device == null || !IsDeviceHealthy(device))
                 {
                     RefreshSingleDeviceInternal(fireEventIfChanged: false);
                 }
 
-                if (device != null)
+                if (device != null && IsDeviceAlive(device))
                 {
                     try
                     {
                         bool targetMute = !device.AudioEndpointVolume.Mute;
                         device.AudioEndpointVolume.Mute = targetMute;
-                        lastMuteState = targetMute;
-                        return targetMute;
                     }
-                    catch { }
+                    catch
+                    {
+                        try
+                        {
+                            string id = SafeGetDeviceId(device);
+                            if (!string.IsNullOrEmpty(id) && deviceEnumerator != null)
+                            {
+                                using (var fresh = deviceEnumerator.GetDevice(id))
+                                {
+                                    bool targetMute = !fresh.AudioEndpointVolume.Mute;
+                                    fresh.AudioEndpointVolume.Mute = targetMute;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
-                return lastMuteState;
+
+                bool actualMute = IsMuted;
+                lastMuteState = actualMute;
+                return actualMute;
             }
         }
     }
@@ -338,6 +443,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
                 UnsubscribeDevice(device);
                 device = null;
                 currentDeviceId = null;
+                lastMuteState = false;
                 if (fireEventIfChanged)
                 {
                     AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
@@ -346,33 +452,28 @@ public class AudioDeviceWatcher : IMMNotificationClient
             return;
         }
 
-        bool isSame = (device == null && newDevice == null) ||
-                      (device != null && newDevice != null && currentDeviceId != null && currentDeviceId == newId);
+        bool isSameId = (device != null && newDevice != null && currentDeviceId != null && currentDeviceId == newId);
 
-        if (isSame)
+        if (isSameId)
         {
-            if (newDevice != null && newDevice != device)
+            if (IsDeviceHealthy(device))
             {
-                try { newDevice.Dispose(); } catch { }
-            }
-
-            if (device != null)
-            {
-                try
+                if (newDevice != null && newDevice != device)
                 {
-                    bool currentMute = device.AudioEndpointVolume.Mute;
-                    if (currentMute != lastMuteState)
+                    try { newDevice.Dispose(); } catch { }
+                }
+
+                bool currentMute = IsMuted;
+                if (currentMute != lastMuteState)
+                {
+                    lastMuteState = currentMute;
+                    if (fireEventIfChanged)
                     {
-                        lastMuteState = currentMute;
-                        if (fireEventIfChanged)
-                        {
-                            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
-                        }
+                        AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
                     }
                 }
-                catch { }
+                return;
             }
-            return;
         }
 
         UnsubscribeDevice(device);
@@ -387,14 +488,11 @@ public class AudioDeviceWatcher : IMMNotificationClient
             }
             catch { }
 
-            try
-            {
-                lastMuteState = device.AudioEndpointVolume.Mute;
-            }
-            catch
-            {
-                lastMuteState = false;
-            }
+            lastMuteState = IsMuted;
+        }
+        else
+        {
+            lastMuteState = false;
         }
 
         if (fireEventIfChanged)
@@ -431,7 +529,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
         device = null;
         currentDeviceId = null;
 
-        List<MMDevice> newDeviceList = new List<MMDevice>();
+        List<MMDevice> newEndpointsList = new List<MMDevice>();
         try
         {
             MMDeviceCollection endpoints = SafeEnumerateCaptureEndPoints();
@@ -444,7 +542,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
                         MMDevice ep = endpoints[i];
                         if (IsDeviceAlive(ep))
                         {
-                            newDeviceList.Add(ep);
+                            newEndpointsList.Add(ep);
                         }
                         else
                         {
@@ -457,92 +555,83 @@ public class AudioDeviceWatcher : IMMNotificationClient
         }
         catch { }
 
-        // If enumeration returned 0 devices, but we currently have devices, don't wipe out on a temporary glitch!
-        if (newDeviceList.Count == 0 && allDevices.Count > 0)
+        if (newEndpointsList.Count == 0)
         {
-            return;
-        }
-
-        List<string> oldIds = new List<string>();
-        foreach (var d in allDevices)
-        {
-            string id = SafeGetDeviceId(d);
-            if (!string.IsNullOrEmpty(id)) oldIds.Add(id);
-        }
-
-        List<string> newIds = new List<string>();
-        foreach (var d in newDeviceList)
-        {
-            string id = SafeGetDeviceId(d);
-            if (!string.IsNullOrEmpty(id)) newIds.Add(id);
-        }
-
-        bool devicesUnchanged = (oldIds.Count == newIds.Count) && !oldIds.Except(newIds).Any();
-
-        if (devicesUnchanged && allDevices.Count > 0)
-        {
-            foreach (var d in newDeviceList)
-            {
-                try { d.Dispose(); } catch { }
-            }
-
-            bool anyUnmuted = false;
+            bool anyExistingAlive = false;
             foreach (var d in allDevices)
             {
-                try
-                {
-                    if (!d.AudioEndpointVolume.Mute)
-                    {
-                        anyUnmuted = true;
-                        break;
-                    }
-                }
-                catch { }
+                if (IsDeviceAlive(d)) { anyExistingAlive = true; break; }
             }
-            bool currentMute = !anyUnmuted;
-            if (currentMute != lastMuteState)
+            if (anyExistingAlive)
             {
-                lastMuteState = currentMute;
+                return;
+            }
+            else
+            {
+                UnsubscribeAllDevicesList();
+                lastMuteState = false;
                 if (fireEventIfChanged)
                 {
                     AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
                 }
+                return;
             }
-            return;
         }
 
-        UnsubscribeAllDevicesList();
-        allDevices.AddRange(newDeviceList);
+        List<MMDevice> updatedDevices = new List<MMDevice>();
+        bool listChanged = false;
 
-        bool anyUnmutedNew = false;
-        for (int i = 0; i < allDevices.Count; i++)
+        foreach (var freshEp in newEndpointsList)
         {
-            var d = allDevices[i];
-            try
+            string freshId = SafeGetDeviceId(freshEp);
+            if (string.IsNullOrEmpty(freshId))
             {
-                try
-                {
-                    d.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
-                }
-                catch { }
-
-                try
-                {
-                    if (!d.AudioEndpointVolume.Mute)
-                    {
-                        anyUnmutedNew = true;
-                    }
-                }
-                catch { }
+                try { freshEp.Dispose(); } catch { }
+                continue;
             }
-            catch { }
+
+            MMDevice existing = allDevices.FirstOrDefault(d => SafeGetDeviceId(d) == freshId);
+            if (existing != null && IsDeviceHealthy(existing))
+            {
+                updatedDevices.Add(existing);
+                try { freshEp.Dispose(); } catch { }
+            }
+            else
+            {
+                if (existing != null)
+                {
+                    UnsubscribeDevice(existing);
+                }
+                try
+                {
+                    freshEp.AudioEndpointVolume.OnVolumeNotification += VolumeNotification;
+                }
+                catch { }
+                updatedDevices.Add(freshEp);
+                listChanged = true;
+            }
         }
 
-        lastMuteState = (allDevices.Count > 0) ? !anyUnmutedNew : false;
-
-        if (fireEventIfChanged)
+        foreach (var oldDev in allDevices)
         {
-            AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+            if (!updatedDevices.Contains(oldDev))
+            {
+                UnsubscribeDevice(oldDev);
+                listChanged = true;
+            }
+        }
+
+        allDevices.Clear();
+        allDevices.AddRange(updatedDevices);
+
+        bool currentMute = IsMuted;
+        if (listChanged || currentMute != lastMuteState)
+        {
+            lastMuteState = currentMute;
+            if (fireEventIfChanged)
+            {
+                AudioDeviceChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 
@@ -557,18 +646,7 @@ public class AudioDeviceWatcher : IMMNotificationClient
 
                 if (string.IsNullOrEmpty(targetDeviceId))
                 {
-                    // 1. Try Communications role
-                    try
-                    {
-                        MMDevice defaultEndpoint = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-                        if (IsDeviceAlive(defaultEndpoint))
-                        {
-                            return defaultEndpoint;
-                        }
-                    }
-                    catch { }
-
-                    // 2. Try Console role (standard default recording device)
+                    // 1. Try Console role (standard default recording device)
                     try
                     {
                         MMDevice defaultEndpoint = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
@@ -579,10 +657,21 @@ public class AudioDeviceWatcher : IMMNotificationClient
                     }
                     catch { }
 
-                    // 3. Try Multimedia role
+                    // 2. Try Multimedia role
                     try
                     {
                         MMDevice defaultEndpoint = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+                        if (IsDeviceAlive(defaultEndpoint))
+                        {
+                            return defaultEndpoint;
+                        }
+                    }
+                    catch { }
+
+                    // 3. Try Communications role
+                    try
+                    {
+                        MMDevice defaultEndpoint = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
                         if (IsDeviceAlive(defaultEndpoint))
                         {
                             return defaultEndpoint;
@@ -662,6 +751,22 @@ public class AudioDeviceWatcher : IMMNotificationClient
         try
         {
             return (dev.State & DeviceState.Active) == DeviceState.Active;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsDeviceHealthy(MMDevice dev)
+    {
+        if (dev == null) return false;
+        try
+        {
+            if ((dev.State & DeviceState.Active) != DeviceState.Active)
+                return false;
+            var testMute = dev.AudioEndpointVolume.Mute;
+            return true;
         }
         catch
         {

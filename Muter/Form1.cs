@@ -90,15 +90,15 @@ namespace Muter
             watcher.RefreshDevice();
             UpdateMicrophoneStatus();
 
-            // Start periodic microphone checker to automatically detect devices after boot/sleep/hotplug
-            microphoneChecker.Interval = 1500;
+            // Start periodic microphone checker to automatically detect devices and external mute state changes
+            microphoneChecker.Interval = 500;
             microphoneChecker.Tick += MicrophoneChecker_Tick;
             microphoneChecker.Start();
 
             isLoaded = true;
         }
 
-        // Periodically checks if audio devices have become available (especially after system boot or sleep).
+        // Periodically checks if audio devices have become available or if mute state has changed externally.
         private void MicrophoneChecker_Tick(object sender, EventArgs e)
         {
             try
@@ -106,6 +106,13 @@ namespace Muter
                 if (!IsMicrophoneAvailable())
                 {
                     watcher.RefreshDevice();
+                    UpdateMicrophoneStatus();
+                    return;
+                }
+
+                bool realMuted = watcher.IsMuted;
+                if (realMuted != isMuted)
+                {
                     UpdateMicrophoneStatus();
                 }
             }

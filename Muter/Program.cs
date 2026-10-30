@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using Muter.Audio;
@@ -46,24 +47,33 @@ namespace Muter
             }
         }
 
+        // Settings that versions before 1.1 could have saved; any of them means Muter was used before.
+        private static readonly string[] LegacySettingNames = { "shortcut", "selectedDeviceId", "selectedDeviceName", "showGui", "syncDevices" };
+
         // Carries settings over from the previous version and converts the old text hotkey ("SHIFT + F") to key codes.
-        internal static void MigrateSettings(Settings settings)
+        // Someone upgrading keeps their hotkey (including the old Shift + F default); a new install gets Hotkey.Default.
+        // previousVersion is Settings.GetPreviousVersion; tests replace it.
+        internal static void MigrateSettings(Settings settings, Func<string, object> previousVersion = null)
         {
             try
             {
+                previousVersion = previousVersion ?? settings.GetPreviousVersion;
+                bool usedBefore = false;
                 if (settings.settingsUpgradeRequired)
                 {
+                    usedBefore = LegacySettingNames.Any(name => previousVersion(name) != null);
                     settings.Upgrade();
                     settings.settingsUpgradeRequired = false;
-                    Log.Info("Settings carried over from the previous version");
+                    Log.Info(usedBefore ? "Settings carried over from the previous version" : "First start");
                 }
 
                 if (!Hotkey.TryFromSettings(settings.hotkeyKey, settings.hotkeyModifiers, out _))
                 {
-                    Hotkey hotkey = Hotkey.TryParse(settings.shortcut, out Hotkey parsed) ? parsed : Hotkey.Default;
+                    // The text setting defaults to "SHIFT + F", which is only meaningful for someone who used an older version.
+                    Hotkey hotkey = usedBefore && Hotkey.TryParse(settings.shortcut, out Hotkey parsed) ? parsed : Hotkey.Default;
                     settings.hotkeyKey = (int)hotkey.Key;
                     settings.hotkeyModifiers = (int)hotkey.Modifiers;
-                    Log.Info($"Hotkey '{settings.shortcut}' migrated to {hotkey}");
+                    Log.Info(usedBefore ? $"Hotkey '{settings.shortcut}' migrated to {hotkey}" : $"Hotkey set to the default {hotkey}");
                 }
 
                 settings.Save();

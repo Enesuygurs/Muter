@@ -16,7 +16,11 @@ namespace Muter.Hotkeys
 
     public struct Hotkey : IEquatable<Hotkey>
     {
-        public static readonly Hotkey Default = new Hotkey(Keys.F, HotkeyModifiers.Shift);
+        // A combination that cannot block typing in other applications (unlike a letter key).
+        public static readonly Hotkey Default = new Hotkey(Keys.F9, HotkeyModifiers.Control | HotkeyModifiers.Shift);
+
+        // What versions before 1.1 used when no hotkey had been saved; existing users keep it.
+        public static readonly Hotkey LegacyDefault = new Hotkey(Keys.F, HotkeyModifiers.Shift);
 
         public Hotkey(Keys key, HotkeyModifiers modifiers)
         {

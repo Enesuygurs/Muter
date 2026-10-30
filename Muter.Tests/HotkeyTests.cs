@@ -77,9 +77,10 @@ namespace Muter.Tests
         }
 
         [Fact]
-        public void Default_is_shift_f()
+        public void Default_does_not_block_typing_and_legacy_default_is_shift_f()
         {
-            Assert.Equal("Shift + F", Hotkey.Default.ToString());
+            Assert.Equal("Control + Shift + F9", Hotkey.Default.ToString());
+            Assert.Equal("Shift + F", Hotkey.LegacyDefault.ToString());
             Assert.True(Hotkey.Default.IsValid);
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Muter.Audio;
@@ -28,8 +29,9 @@ namespace Muter.Tests
                 settings.hotkeyKey = (int)Keys.F9;
                 configure?.Invoke(settings);
                 var played = new List<FeedbackSound>();
+                // Sounds are started on the audio thread.
                 using (var app = new TrayApplicationContext(settings, () => provider, new FakeGlobalHotkey(),
-                    new StartupRegistration(Application.ExecutablePath, StartupKey), played.Add))
+                    new StartupRegistration(Application.ExecutablePath, StartupKey), sound => { lock (played) played.Add(sound); }))
                 {
                     Assert.True(app.WaitForAudio());
                     played.Clear();
@@ -164,6 +166,12 @@ namespace Muter.Tests
                 Assert.Equal(wave.Length - 8, BitConverter.ToInt32(wave, 4));
                 double seconds = (wave.Length - 44) / 2.0 / 44100;
                 Assert.InRange(seconds, 0.1, 0.4);
+
+                // The same sound at the output's own rate (no resampling when it is played).
+                float[] samples = FeedbackSounds.Samples(sound, 48000);
+                Assert.InRange(samples.Length / 48000.0, seconds - 0.01, seconds + 0.01);
+                Assert.All(samples, s => Assert.InRange(s, -1f, 1f));
+                Assert.True(samples.Take(48).Max(Math.Abs) < 0.1f, "starts softly, without a click");
             }
         }
     }

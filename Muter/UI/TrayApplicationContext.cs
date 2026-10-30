@@ -53,6 +53,8 @@ namespace Muter.UI
         private readonly NativeWindow closeTarget = new NativeWindow();
         private readonly Action<FeedbackSound> playSound;
         private readonly KeyReleaseWatcher pushToTalkRelease;
+        private readonly bool realSounds;
+        private volatile bool soundEnabled;
         private MicrophoneStatus status = MicrophoneStatus.ReadFailure;
         private bool audioNotResponding;
         private Hotkey configuredHotkey;
@@ -70,6 +72,8 @@ namespace Muter.UI
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.playSound = playSound ?? FeedbackSounds.Play;
+            realSounds = playSound == null;
+            soundEnabled = settings.soundFeedback;
             this.hotkey = hotkey ?? throw new ArgumentNullException(nameof(hotkey));
             this.startup = startup ?? throw new ArgumentNullException(nameof(startup));
             if (providerFactory == null)
@@ -103,7 +107,14 @@ namespace Muter.UI
             };
 
             audio = new AudioWorker(providerFactory, settings.selectedDeviceId, settings.syncDevices);
-            audio.StatusAvailable += (newStatus, source) => Post(() => OnStatus(newStatus, source));
+            audio.StatusAvailable += (newStatus, source) =>
+            {
+                // The sound is started right here on the audio thread, as soon as the result is verified, rather than
+                // after the UI thread gets to it.
+                if (source == StatusSource.MuteAction && soundEnabled && !shutDown)
+                    Safely("sound", () => this.playSound(SoundFor(newStatus.State)));
+                Post(() => OnStatus(newStatus, source));
+            };
 
             // The release is handled off the UI thread and goes straight to the audio thread.
             pushToTalkRelease = new KeyReleaseWatcher(() => audio.SetMuted(true, StatusSource.MuteAction), isKeyDown);
@@ -127,6 +138,8 @@ namespace Muter.UI
                 Log.Info("Push to talk is on: muting");
                 audio.SetMuted(true, StatusSource.Setting);
             }
+            if (realSounds && settings.soundFeedback)
+                FeedbackSounds.Prepare();
             audio.RequestRefresh();
             pollTimer.Start();
         }
@@ -237,8 +250,6 @@ namespace Muter.UI
                 Log.Info("Audio system responding again");
             audioNotResponding = false;
             UpdateUi(forceOverlay: source != StatusSource.Refresh);
-            if (source == StatusSource.MuteAction && settings.soundFeedback)
-                Safely("sound", () => playSound(SoundFor(newStatus.State)));
         }
 
         // The sound tells the verified result, not what was asked for: "muted" only when every microphone reads muted.
@@ -255,7 +266,10 @@ namespace Muter.UI
         internal void SetSoundFeedback(bool enabled)
         {
             settings.soundFeedback = enabled;
+            soundEnabled = enabled;
             SaveSettings();
+            if (!enabled && realSounds)
+                FeedbackSounds.Release();
             if (enabled)
                 Safely("sound", () => playSound(SoundFor(audioNotResponding ? MicState.Unknown : status.State)));
         }
@@ -957,6 +971,9 @@ namespace Muter.UI
             miniIndicator.Dispose();
             pollTimer.Dispose();
             menuFont.Dispose();
+
+            if (realSounds)
+                FeedbackSounds.Release();
 
             // Stops the audio thread, which releases the devices; never blocks exit for long.
             audio.Dispose();

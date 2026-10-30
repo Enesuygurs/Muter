@@ -86,6 +86,8 @@ namespace Muter.UI
 
         internal ToggleSwitch SoundToggle { get; private set; }
 
+        internal ToggleSwitch PushToTalkToggle { get; private set; }
+
         internal ToggleSwitch ShowOverlayToggle { get; private set; }
 
         internal DropdownButton PositionDropdown { get; private set; }
@@ -341,6 +343,10 @@ namespace Muter.UI
             hotkeyPanel.Controls.Add(ChangeHotkeyButton);
             AddRow(page, "Mute hotkey", "Mutes and unmutes from any app", hotkeyPanel, ref y);
 
+            PushToTalkToggle = new ToggleSwitch();
+            PushToTalkToggle.Toggled += (s, e) => Apply(() => app.SetPushToTalk(PushToTalkToggle.Checked));
+            AddRow(page, "Push to talk", "Hold the hotkey to talk; muted again when you let go", PushToTalkToggle, ref y);
+
             y += 6;
             AddSection(page, "Sound", ref y);
             SoundToggle = new ToggleSwitch();
@@ -431,6 +437,7 @@ namespace Muter.UI
                 HotkeyKeys.Keycaps = HotkeyText.Parts(app.ConfiguredHotkey);
                 StartupToggle.Checked = app.IsStartupEnabled();
                 SoundToggle.Checked = settings.soundFeedback;
+                PushToTalkToggle.Checked = settings.pushToTalk;
 
                 ShowOverlayToggle.Checked = settings.showGui;
                 PositionDropdown.SelectedValue = OverlayPlacement.ParseEnum(settings.overlayPosition, OverlayAnchor.LowerCenter);

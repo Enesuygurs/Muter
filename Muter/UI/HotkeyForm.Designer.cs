@@ -28,107 +28,135 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.key = new System.Windows.Forms.TextBox();
-            this.setButton = new System.Windows.Forms.Button();
-            this.label1 = new System.Windows.Forms.Label();
-            this.topPanel = new System.Windows.Forms.Panel();
-            this.closeButton = new System.Windows.Forms.Label();
-            this.title = new System.Windows.Forms.Label();
-            this.topPanel.SuspendLayout();
+            this.iconBox = new System.Windows.Forms.PictureBox();
+            this.titleLabel = new System.Windows.Forms.Label();
+            this.closeButton = new Muter.UI.Controls.FlatButton();
+            this.descriptionLabel = new System.Windows.Forms.Label();
+            this.captureBox = new Muter.UI.Controls.KeyCaptureBox();
+            this.statusLabel = new System.Windows.Forms.Label();
+            this.resetButton = new Muter.UI.Controls.FlatButton();
+            this.cancelButton = new Muter.UI.Controls.FlatButton();
+            this.saveButton = new Muter.UI.Controls.FlatButton();
+            ((System.ComponentModel.ISupportInitialize)(this.iconBox)).BeginInit();
             this.SuspendLayout();
-            // 
-            // key
-            // 
-            this.key.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.key.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
-            this.key.Font = new System.Drawing.Font("Segoe UI Semibold", 10F, System.Drawing.FontStyle.Bold);
-            this.key.ForeColor = System.Drawing.Color.Black;
-            this.key.Location = new System.Drawing.Point(45, 54);
-            this.key.Margin = new System.Windows.Forms.Padding(0);
-            this.key.Name = "key";
-            this.key.ReadOnly = true;
-            this.key.Size = new System.Drawing.Size(119, 18);
-            this.key.TabIndex = 0;
-            this.key.Text = "SHIFT + F";
-            this.key.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            this.key.Click += new System.EventHandler(this.key_Click);
-            // 
-            // setButton
-            // 
-            this.setButton.BackColor = System.Drawing.Color.OrangeRed;
-            this.setButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.setButton.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
-            this.setButton.ForeColor = System.Drawing.SystemColors.Control;
-            this.setButton.Location = new System.Drawing.Point(45, 77);
-            this.setButton.Name = "setButton";
-            this.setButton.Size = new System.Drawing.Size(119, 26);
-            this.setButton.TabIndex = 1;
-            this.setButton.Text = "Set Key";
-            this.setButton.UseVisualStyleBackColor = false;
-            this.setButton.Click += new System.EventHandler(this.setButton_Click);
-            // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Font = new System.Drawing.Font("Segoe UI Semibold", 10F, System.Drawing.FontStyle.Bold);
-            this.label1.Location = new System.Drawing.Point(88, 29);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(32, 19);
-            this.label1.TabIndex = 2;
-            this.label1.Text = "Key";
-            // 
-            // topPanel
-            // 
-            this.topPanel.BackColor = System.Drawing.Color.OrangeRed;
-            this.topPanel.Controls.Add(this.closeButton);
-            this.topPanel.Controls.Add(this.title);
-            this.topPanel.Location = new System.Drawing.Point(0, 0);
-            this.topPanel.Name = "topPanel";
-            this.topPanel.Size = new System.Drawing.Size(208, 20);
-            this.topPanel.TabIndex = 3;
-            this.topPanel.MouseDown += new System.Windows.Forms.MouseEventHandler(this.DraggableControl_MouseDown);
-            // 
+            //
+            // iconBox
+            //
+            this.iconBox.Location = new System.Drawing.Point(16, 13);
+            this.iconBox.Name = "iconBox";
+            this.iconBox.Size = new System.Drawing.Size(20, 20);
+            this.iconBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.iconBox.TabIndex = 0;
+            this.iconBox.TabStop = false;
+            this.iconBox.MouseDown += new System.Windows.Forms.MouseEventHandler(this.TitleBar_MouseDown);
+            //
+            // titleLabel
+            //
+            this.titleLabel.AutoSize = true;
+            this.titleLabel.Font = new System.Drawing.Font("Segoe UI Semibold", 11F, System.Drawing.FontStyle.Bold);
+            this.titleLabel.ForeColor = System.Drawing.Color.FromArgb(243, 243, 243);
+            this.titleLabel.Location = new System.Drawing.Point(42, 11);
+            this.titleLabel.Name = "titleLabel";
+            this.titleLabel.Size = new System.Drawing.Size(94, 20);
+            this.titleLabel.TabIndex = 1;
+            this.titleLabel.Text = "Mute hotkey";
+            this.titleLabel.MouseDown += new System.Windows.Forms.MouseEventHandler(this.TitleBar_MouseDown);
+            //
             // closeButton
-            // 
-            this.closeButton.AutoSize = true;
-            this.closeButton.Font = new System.Drawing.Font("MS UI Gothic", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
-            this.closeButton.ForeColor = System.Drawing.Color.White;
-            this.closeButton.Location = new System.Drawing.Point(190, 3);
+            //
+            this.closeButton.ButtonStyle = Muter.UI.Controls.FlatButtonStyle.Close;
+            this.closeButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.closeButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 8F);
+            this.closeButton.Location = new System.Drawing.Point(333, 1);
             this.closeButton.Name = "closeButton";
-            this.closeButton.Size = new System.Drawing.Size(16, 13);
-            this.closeButton.TabIndex = 5;
-            this.closeButton.Text = "X";
-            this.closeButton.Click += new System.EventHandler(this.closeButton_Click);
-            // 
-            // title
-            // 
-            this.title.AutoSize = true;
-            this.title.Font = new System.Drawing.Font("MS UI Gothic", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
-            this.title.ForeColor = System.Drawing.Color.White;
-            this.title.Location = new System.Drawing.Point(78, 3);
-            this.title.Name = "title";
-            this.title.Size = new System.Drawing.Size(52, 13);
-            this.title.TabIndex = 4;
-            this.title.Text = "Hotkey";
-            this.title.MouseDown += new System.Windows.Forms.MouseEventHandler(this.DraggableControl_MouseDown);
-            // 
-            // hotkeyForm
-            // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(208, 120);
-            this.Controls.Add(this.topPanel);
-            this.Controls.Add(this.label1);
-            this.Controls.Add(this.setButton);
-            this.Controls.Add(this.key);
+            this.closeButton.Size = new System.Drawing.Size(46, 32);
+            this.closeButton.TabIndex = 7;
+            this.closeButton.TabStop = false;
+            this.closeButton.Text = "";
+            //
+            // descriptionLabel
+            //
+            this.descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(167, 167, 167);
+            this.descriptionLabel.Location = new System.Drawing.Point(16, 46);
+            this.descriptionLabel.Name = "descriptionLabel";
+            this.descriptionLabel.Size = new System.Drawing.Size(348, 36);
+            this.descriptionLabel.TabIndex = 2;
+            this.descriptionLabel.Text = "Press the keys you want to use to mute and unmute your microphone from any app.";
+            //
+            // captureBox
+            //
+            this.captureBox.Font = new System.Drawing.Font("Segoe UI Semibold", 10.5F, System.Drawing.FontStyle.Bold);
+            this.captureBox.Location = new System.Drawing.Point(16, 86);
+            this.captureBox.Name = "captureBox";
+            this.captureBox.Size = new System.Drawing.Size(348, 78);
+            this.captureBox.TabIndex = 0;
+            //
+            // statusLabel
+            //
+            this.statusLabel.ForeColor = System.Drawing.Color.FromArgb(167, 167, 167);
+            this.statusLabel.Location = new System.Drawing.Point(16, 172);
+            this.statusLabel.Name = "statusLabel";
+            this.statusLabel.Size = new System.Drawing.Size(348, 34);
+            this.statusLabel.TabIndex = 3;
+            //
+            // resetButton
+            //
+            this.resetButton.ButtonStyle = Muter.UI.Controls.FlatButtonStyle.Link;
+            this.resetButton.Location = new System.Drawing.Point(16, 214);
+            this.resetButton.Name = "resetButton";
+            this.resetButton.Size = new System.Drawing.Size(112, 28);
+            this.resetButton.TabIndex = 4;
+            this.resetButton.Text = "Reset to default";
+            this.resetButton.Click += new System.EventHandler(this.ResetButton_Click);
+            //
+            // cancelButton
+            //
+            this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.cancelButton.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
+            this.cancelButton.Location = new System.Drawing.Point(196, 212);
+            this.cancelButton.Name = "cancelButton";
+            this.cancelButton.Size = new System.Drawing.Size(80, 32);
+            this.cancelButton.TabIndex = 5;
+            this.cancelButton.Text = "Cancel";
+            //
+            // saveButton
+            //
+            this.saveButton.ButtonStyle = Muter.UI.Controls.FlatButtonStyle.Primary;
+            this.saveButton.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
+            this.saveButton.Location = new System.Drawing.Point(284, 212);
+            this.saveButton.Name = "saveButton";
+            this.saveButton.Size = new System.Drawing.Size(80, 32);
+            this.saveButton.TabIndex = 6;
+            this.saveButton.Text = "Save";
+            this.saveButton.Click += new System.EventHandler(this.SaveButton_Click);
+            //
+            // HotkeyForm
+            //
+            this.AcceptButton = this.saveButton;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
+            this.BackColor = System.Drawing.Color.FromArgb(31, 31, 31);
+            this.CancelButton = this.cancelButton;
+            this.ClientSize = new System.Drawing.Size(380, 258);
+            this.Controls.Add(this.saveButton);
+            this.Controls.Add(this.cancelButton);
+            this.Controls.Add(this.resetButton);
+            this.Controls.Add(this.statusLabel);
+            this.Controls.Add(this.captureBox);
+            this.Controls.Add(this.descriptionLabel);
+            this.Controls.Add(this.closeButton);
+            this.Controls.Add(this.titleLabel);
+            this.Controls.Add(this.iconBox);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.ForeColor = System.Drawing.Color.FromArgb(243, 243, 243);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.MaximumSize = new System.Drawing.Size(208, 120);
-            this.MinimumSize = new System.Drawing.Size(208, 120);
+            this.KeyPreview = true;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.Name = "HotkeyForm";
-            this.Text = "Hotkey";
-            this.Load += new System.EventHandler(this.HotkeyForm_Load);
-            this.topPanel.ResumeLayout(false);
-            this.topPanel.PerformLayout();
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "Muter Hotkey";
+            ((System.ComponentModel.ISupportInitialize)(this.iconBox)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -136,11 +164,14 @@
 
         #endregion
 
-        private System.Windows.Forms.TextBox key;
-        private System.Windows.Forms.Button setButton;
-        private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Panel topPanel;
-        private System.Windows.Forms.Label title;
-        private System.Windows.Forms.Label closeButton;
+        private System.Windows.Forms.PictureBox iconBox;
+        private System.Windows.Forms.Label titleLabel;
+        private Muter.UI.Controls.FlatButton closeButton;
+        private System.Windows.Forms.Label descriptionLabel;
+        private Muter.UI.Controls.KeyCaptureBox captureBox;
+        private System.Windows.Forms.Label statusLabel;
+        private Muter.UI.Controls.FlatButton resetButton;
+        private Muter.UI.Controls.FlatButton cancelButton;
+        private Muter.UI.Controls.FlatButton saveButton;
     }
 }

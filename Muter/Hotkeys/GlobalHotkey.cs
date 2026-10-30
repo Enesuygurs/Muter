@@ -114,8 +114,8 @@ namespace Muter.Hotkeys
 
             int code = Marshal.GetLastWin32Error();
             error = code == 1409 // ERROR_HOTKEY_ALREADY_REGISTERED
-                ? $"{hotkey} is already used by another application. Please choose a different combination."
-                : $"{hotkey} could not be registered: {new Win32Exception(code).Message}";
+                ? $"{HotkeyText.Format(hotkey)} is already used by another app. Try another combination."
+                : $"{HotkeyText.Format(hotkey)} could not be registered: {new Win32Exception(code).Message}";
             Log.Warn(error);
             return false;
         }

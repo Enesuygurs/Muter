@@ -33,7 +33,7 @@ No installation is required.
 | **Sync Devices** | Keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). |
 | **Overlay** | Show Overlay, Position, Size, Display Time, Monitor, Mini Indicator (with its own position and size), **Unlock Positions** to drag the overlay and the mini indicator, and **Reset Positions**. The monitor choice applies to both windows; a dragged window stays on the monitor it was dropped on. |
 | **Run Startup** | Starts Muter with Windows. |
-| **Hotkey** | Pick a new key combination. If another application already uses it, Muter tells you and keeps the old one. |
+| **Hotkey** | Press a new key combination and choose Save. Combinations that would block typing in other apps (such as `Shift + F`) are not accepted, and if another application already uses a combination, Muter tells you and keeps the old one. |
 
 ### What the states mean
 

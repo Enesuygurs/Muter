@@ -25,6 +25,7 @@ namespace Muter.UI
         private const int TitleBarHeight = 44;
         private const int RowHeight = 52;
         private const int RowGap = 6;
+        private const int WindowHeight = 580;
 
         private static readonly OverlaySize[] Sizes = { OverlaySize.Small, OverlaySize.Medium, OverlaySize.Large };
 
@@ -33,6 +34,7 @@ namespace Muter.UI
         private readonly Dictionary<string, Panel> pages = new Dictionary<string, Panel>();
         private readonly Dictionary<string, NavButton> navButtons = new Dictionary<string, NavButton>();
         private readonly Panel content;
+        private SettingRow positionsRow;
         private bool updating;
 
         internal SettingsForm(TrayApplicationContext app)
@@ -47,7 +49,7 @@ namespace Muter.UI
             ForeColor = Theme.TextPrimary;
             Font = new Font(Theme.FontFamily, 9.75F);
             FormBorderStyle = FormBorderStyle.None;
-            ClientSize = new Size(720, 520);
+            ClientSize = new Size(720, WindowHeight);
             StartPosition = FormStartPosition.CenterScreen;
             Text = "Muter Settings";
             Icon = AppResources.AppIcon;
@@ -55,7 +57,7 @@ namespace Muter.UI
 
             BuildTitleBar();
             BuildNavigation();
-            content = new Panel { Location = new Point(196, TitleBarHeight), Size = new Size(508, 520 - TitleBarHeight - 16), BackColor = Theme.Background };
+            content = new Panel { Location = new Point(196, TitleBarHeight), Size = new Size(508, WindowHeight - TitleBarHeight - 16), BackColor = Theme.Background };
             Controls.Add(content);
             BuildGeneralPage();
             BuildOverlayPage();
@@ -91,7 +93,7 @@ namespace Muter.UI
 
         internal DropdownButton MonitorDropdown { get; private set; }
 
-        internal ToggleSwitch UnlockToggle { get; private set; }
+        internal FlatButton MovePositionsButton { get; private set; }
 
         internal FlatButton ResetPositionsButton { get; private set; }
 
@@ -218,7 +220,7 @@ namespace Muter.UI
             {
                 Text = "Muter " + VersionText(),
                 AutoSize = true,
-                Location = new Point(24, 488),
+                Location = new Point(24, WindowHeight - 32),
                 ForeColor = Theme.TextDisabled,
                 Font = new Font(Theme.FontFamily, 8.25F),
             };
@@ -307,6 +309,23 @@ namespace Muter.UI
             hotkeyPanel.Controls.Add(ChangeHotkeyButton);
             AddRow(page, "Mute hotkey", "Mutes and unmutes from any app", hotkeyPanel, ref y);
 
+            // Settings shared by the overlay and the mini indicator.
+            y += 6;
+            AddSection(page, "Screen", ref y);
+            MonitorDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
+            MonitorDropdown.DropDownOpening += (s, e) => RefreshMonitorOptions();
+            MonitorDropdown.SelectionChanged += (s, e) => Apply(() => app.SetMonitor((string)MonitorDropdown.SelectedValue));
+            AddRow(page, "Monitor", "For the overlay and mini indicator", MonitorDropdown, ref y);
+
+            var positionsPanel = new Panel { Size = new Size(168, 32), BackColor = Theme.Surface };
+            MovePositionsButton = new FlatButton { Text = "Move", Location = new Point(0, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            MovePositionsButton.Click += (s, e) => Apply(() => app.SetPositionsUnlocked(!app.PositionsUnlocked));
+            ResetPositionsButton = new FlatButton { Text = "Reset", Location = new Point(88, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ResetPositionsButton.Click += (s, e) => Apply(app.ResetPositions);
+            positionsPanel.Controls.Add(MovePositionsButton);
+            positionsPanel.Controls.Add(ResetPositionsButton);
+            positionsRow = AddRow(page, "Positions", string.Empty, positionsPanel, ref y);
+
             y += 6;
             AddSection(page, "Startup", ref y);
             StartupToggle = new ToggleSwitch();
@@ -336,19 +355,6 @@ namespace Muter.UI
             DisplayTimeDropdown.SetOptions(TrayApplicationContext.DisplayTimeChoices.Select(ms => new DropdownOption(TrayApplicationContext.DisplayTimeLabel(ms), ms)), null);
             DisplayTimeDropdown.SelectionChanged += (s, e) => Apply(() => app.SetDisplayTime((int)DisplayTimeDropdown.SelectedValue));
             AddRow(page, "Display time", "How long it stays before fading out", DisplayTimeDropdown, ref y);
-
-            MonitorDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
-            MonitorDropdown.DropDownOpening += (s, e) => RefreshMonitorOptions();
-            MonitorDropdown.SelectionChanged += (s, e) => Apply(() => app.SetMonitor((string)MonitorDropdown.SelectedValue));
-            AddRow(page, "Monitor", "Also used by the mini indicator", MonitorDropdown, ref y);
-
-            UnlockToggle = new ToggleSwitch();
-            UnlockToggle.Toggled += (s, e) => Apply(() => app.SetPositionsUnlocked(UnlockToggle.Checked));
-            AddRow(page, "Move by dragging", "Unlocks the overlay and the mini indicator", UnlockToggle, ref y);
-
-            ResetPositionsButton = new FlatButton { Text = "Reset", Size = new Size(80, 30), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
-            ResetPositionsButton.Click += (s, e) => Apply(app.ResetPositions);
-            AddRow(page, "Reset positions", "Back to the default places on the primary monitor", ResetPositionsButton, ref y);
         }
 
         private void BuildMiniIndicatorPage()
@@ -425,7 +431,7 @@ namespace Muter.UI
                 SizeSegments.SelectedIndex = Array.IndexOf(Sizes, OverlayPlacement.ParseEnum(settings.overlaySize, OverlaySize.Medium));
                 DisplayTimeDropdown.SelectedValue = TrayApplicationContext.DisplayTimeChoices.Contains(settings.overlayDurationMs) ? settings.overlayDurationMs : 1000;
                 RefreshMonitorOptions();
-                UnlockToggle.Checked = app.PositionsUnlocked;
+                RefreshPositionsRow();
 
                 MiniIndicatorToggle.Checked = settings.miniIndicatorEnabled;
                 MiniPositionDropdown.SelectedValue = OverlayPlacement.ParseEnum(settings.miniIndicatorPosition, OverlayAnchor.BottomRight);
@@ -444,6 +450,19 @@ namespace Muter.UI
             if (listFailed)
                 options.Add(new DropdownOption("(Could not list the microphones)", "\0failed", enabled: false));
             DevicesDropdown.SetOptions(options, app.SelectedDeviceId ?? string.Empty);
+        }
+
+        // Move turns into a highlighted Done while the overlays can be dragged; it is unavailable when nothing is shown.
+        private void RefreshPositionsRow()
+        {
+            bool unlocked = app.PositionsUnlocked;
+            bool anythingShown = settings.showGui || settings.miniIndicatorEnabled;
+            MovePositionsButton.Text = unlocked ? "Done" : "Move";
+            MovePositionsButton.ButtonStyle = unlocked ? FlatButtonStyle.Primary : FlatButtonStyle.Secondary;
+            MovePositionsButton.Enabled = unlocked || anythingShown;
+            positionsRow.Description = unlocked ? "Drag them now, then click Done"
+                : anythingShown ? "Drag the overlay and the mini indicator anywhere"
+                : "Turn on the overlay or the mini indicator first";
         }
 
         private void RefreshMonitorOptions()

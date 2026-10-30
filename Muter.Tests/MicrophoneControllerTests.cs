@@ -185,15 +185,78 @@ namespace Muter.Tests
         }
 
         [Fact]
-        public void Sync_with_unknown_history_follows_the_default_recording_device()
+        public void Sync_with_unknown_history_mutes_even_if_the_default_device_is_live()
         {
             provider.Add("a", muted: false);
             provider.Add("b", muted: true);
-            provider.SetDefault("b");
+            provider.SetDefault("a");
             var controller = Create(MicrophoneController.AllDevicesId, sync: true);
 
             Assert.Equal(MicState.Muted, controller.Status.State);
             Assert.All(provider.Devices, d => Assert.True(d.Muted));
+        }
+
+        [Fact]
+        public void A_read_failure_does_not_erase_which_microphone_changed()
+        {
+            provider.Add("a", muted: true);
+            provider.Add("b", muted: true);
+            provider.SetDefault("a");
+            var controller = Create(MicrophoneController.AllDevicesId, sync: true);
+
+            provider.FailEnumeration = true;
+            Assert.Equal(MicState.Unknown, controller.Refresh().State);
+            provider.FailEnumeration = false;
+
+            provider.Get("b").Muted = false; // the user unmutes b in Windows
+            Assert.Equal(MicState.Live, controller.Refresh().State);
+            Assert.False(provider.Get("a").Muted); // a followed b; b was not silently muted again
+        }
+
+        [Fact]
+        public void Sync_never_unmutes_a_microphone_it_cannot_read()
+        {
+            provider.Add("a", muted: true);
+            provider.Add("b", muted: true);
+            FakeDevice unreadable = provider.Add("c", muted: true);
+            var controller = Create(MicrophoneController.AllDevicesId, sync: true);
+            unreadable.FailReads = -1;
+
+            provider.Get("a").Muted = false;
+            Assert.Equal(MicState.Live, controller.Refresh().State);
+            Assert.False(provider.Get("b").Muted);
+            Assert.True(unreadable.Muted);
+            Assert.Equal(0, unreadable.Writes);
+        }
+
+        [Fact]
+        public void Switching_mode_with_sync_keeps_the_current_mute_state()
+        {
+            provider.Add("a");
+            provider.Add("b");
+            provider.SetDefault("a");
+            var controller = Create(null, sync: true);
+            Assert.Equal(MicState.Muted, controller.ToggleMute().State);
+            Assert.False(provider.Get("b").Muted);
+
+            Assert.Equal(MicState.Muted, controller.SetTarget(MicrophoneController.AllDevicesId).State);
+            Assert.True(provider.Get("b").Muted); // b follows the microphone that was controlled until now
+        }
+
+        [Fact]
+        public void A_default_device_missing_from_the_list_is_still_targeted()
+        {
+            provider.Add("console");
+            FakeDevice comms = provider.Add("comms");
+            provider.SetDefault("console", EndpointRole.Console, EndpointRole.Multimedia);
+            provider.SetDefault("comms", EndpointRole.Communications);
+            comms.Active = false;
+            provider.ReportInactiveDefaults = true; // reported as default while it is not (or no longer) in the list
+            var controller = Create();
+
+            Assert.Equal(2, controller.Status.DeviceCount);
+            Assert.Equal(MicState.Unknown, controller.ToggleMute().State); // never Muted while one default is unverified
+            Assert.True(provider.Get("console").Muted);
         }
 
         [Fact]
@@ -217,8 +280,8 @@ namespace Muter.Tests
             Assert.Equal(MicState.Live, controller.Status.State);
 
             controller.SyncDevices = true;
-            Assert.Equal(MicState.Live, controller.Refresh().State);
-            Assert.All(provider.Devices, d => Assert.False(d.Muted)); // followed the default device (live)
+            Assert.Equal(MicState.Muted, controller.Refresh().State);
+            Assert.All(provider.Devices, d => Assert.True(d.Muted)); // no device changed: when unsure, mute
         }
 
         [Fact]
@@ -226,7 +289,7 @@ namespace Muter.Tests
         {
             var previous = new Dictionary<string, bool> { ["a"] = false, ["b"] = false };
             var current = new Dictionary<string, bool> { ["a"] = true, ["b"] = false };
-            Assert.True(MicrophoneController.DecideSyncTarget(current, previous, "b"));
+            Assert.True(MicrophoneController.DecideSyncTarget(current, previous));
         }
 
         [Fact]
@@ -234,7 +297,7 @@ namespace Muter.Tests
         {
             var previous = new Dictionary<string, bool> { ["a"] = true, ["b"] = true };
             var current = new Dictionary<string, bool> { ["a"] = true, ["b"] = false };
-            Assert.False(MicrophoneController.DecideSyncTarget(current, previous, "a"));
+            Assert.False(MicrophoneController.DecideSyncTarget(current, previous));
         }
 
         [Fact]
@@ -242,7 +305,7 @@ namespace Muter.Tests
         {
             var current = new Dictionary<string, bool> { ["a"] = true, ["b"] = false };
             var previous = new Dictionary<string, bool> { ["a"] = false, ["b"] = true };
-            Assert.True(MicrophoneController.DecideSyncTarget(current, previous, "b"));
+            Assert.True(MicrophoneController.DecideSyncTarget(current, previous));
         }
 
         [Fact]
@@ -250,7 +313,7 @@ namespace Muter.Tests
         {
             var current = new Dictionary<string, bool> { ["a"] = false, ["b"] = false, ["new"] = true };
             var previous = new Dictionary<string, bool> { ["a"] = false, ["b"] = false };
-            Assert.False(MicrophoneController.DecideSyncTarget(current, previous, "new"));
+            Assert.False(MicrophoneController.DecideSyncTarget(current, previous));
         }
 
         // ---- Failures: never show muted unless verified ---------------------------------------------------------

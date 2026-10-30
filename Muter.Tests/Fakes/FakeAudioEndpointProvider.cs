@@ -36,9 +36,17 @@ namespace Muter.Tests.Fakes
         public override string ToString() => $"{Id}{(Active ? "" : " (inactive)")}: {(Muted ? "muted" : "LIVE")}";
     }
 
-    // In-memory IAudioEndpointProvider with failure injection.
+    // In-memory IAudioEndpointProvider with failure injection. Thread-safe: the app uses it from its audio thread.
     internal sealed class FakeAudioEndpointProvider : IAudioEndpointProvider
     {
+        private readonly object sync = new object();
+
+        // When set, reads wait for it: simulates a hung audio driver.
+        public System.Threading.ManualResetEventSlim BlockReads { get; set; }
+
+        // Like a race with a device that just vanished: defaults are reported even for inactive devices.
+        public bool ReportInactiveDefaults { get; set; }
+
         public List<FakeDevice> Devices { get; } = new List<FakeDevice>();
 
         public Dictionary<EndpointRole, string> Defaults { get; } = new Dictionary<EndpointRole, string>();
@@ -58,7 +66,8 @@ namespace Muter.Tests.Fakes
         public FakeDevice Add(string id, bool muted = false, string name = null)
         {
             var device = new FakeDevice(id, name ?? "Mic " + id, muted);
-            Devices.Add(device);
+            lock (sync)
+                Devices.Add(device);
             return device;
         }
 
@@ -78,7 +87,8 @@ namespace Muter.Tests.Fakes
         {
             if (FailEnumeration)
                 throw new AudioDeviceException("enumeration failed (fake)", unchecked((int)0x80004005), enumeratorFailure: true);
-            return Devices.Where(d => d.Active).Select(d => new AudioEndpointInfo(d.Id, d.Name)).ToList();
+            lock (sync)
+                return Devices.Where(d => d.Active).Select(d => new AudioEndpointInfo(d.Id, d.Name)).ToList();
         }
 
         public string GetDefaultCaptureEndpointId(EndpointRole role)
@@ -86,13 +96,17 @@ namespace Muter.Tests.Fakes
             if (FailDefaults)
                 throw new AudioDeviceException("default lookup failed (fake)", unchecked((int)0x80004005), enumeratorFailure: true);
             // Like Windows: a default device is always an active one.
-            return Defaults.TryGetValue(role, out string id) && Devices.Any(d => d.Active && string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase))
-                ? id
-                : null;
+            lock (sync)
+            {
+                return Defaults.TryGetValue(role, out string id) && (ReportInactiveDefaults || Devices.Any(d => d.Active && string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase)))
+                    ? id
+                    : null;
+            }
         }
 
         public bool GetMute(string deviceId)
         {
+            BlockReads?.Wait();
             FakeDevice device = Find(deviceId);
             if (device.FailReads != 0)
             {
@@ -119,14 +133,17 @@ namespace Muter.Tests.Fakes
 
         public void WatchMuteChanges(IEnumerable<string> deviceIds)
         {
-            WatchCalls.Add(new HashSet<string>(deviceIds, StringComparer.OrdinalIgnoreCase));
+            lock (sync)
+                WatchCalls.Add(new HashSet<string>(deviceIds, StringComparer.OrdinalIgnoreCase));
         }
 
         public void Dispose() => Disposed = true;
 
         private FakeDevice Find(string deviceId)
         {
-            FakeDevice device = Devices.FirstOrDefault(d => string.Equals(d.Id, deviceId, StringComparison.OrdinalIgnoreCase));
+            FakeDevice device;
+            lock (sync)
+                device = Devices.FirstOrDefault(d => string.Equals(d.Id, deviceId, StringComparison.OrdinalIgnoreCase));
             if (device == null || !device.Active)
                 throw new AudioDeviceException("device not active (fake)");
             return device;

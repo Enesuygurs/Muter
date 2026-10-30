@@ -77,6 +77,25 @@ namespace Muter.Tests.Hardware
         }
 
         [Fact]
+        public void Setting_the_state_a_microphone_already_has_is_not_an_error()
+        {
+            // Windows answers S_FALSE ("nothing changed"); that is success, not a failure to retry and log.
+            using (var provider = new CoreAudioEndpointProvider())
+            {
+                foreach (string id in ids)
+                {
+                    foreach (bool mute in new[] { true, false })
+                    {
+                        hw.Write(id, mute);
+                        provider.SetMute(id, mute);
+                        provider.SetMute(id, mute);
+                        Assert.Equal(mute, hw.Read(id));
+                    }
+                }
+            }
+        }
+
+        [Fact]
         public void Works_on_an_STA_thread_like_the_application()
         {
             TestSetup.RunSta(() =>
@@ -114,6 +133,44 @@ namespace Muter.Tests.Hardware
                 signal.Reset();
                 hw.Write(ids[0], !hw.Read(ids[0]));
                 Assert.False(signal.Wait(500), "unwatched device still notifies");
+            }
+        }
+
+        [Fact]
+        public void Volume_only_changes_do_not_trigger_refreshes_but_mute_changes_do()
+        {
+            string id = ids[0];
+            float originalVolume = hw.ReadVolume(id);
+            try
+            {
+                using (var provider = new CoreAudioEndpointProvider())
+                {
+                    int notifications = 0;
+                    provider.MuteStateChanged += (s, e) => Interlocked.Increment(ref notifications);
+                    provider.WatchMuteChanges(new[] { id });
+
+                    // The first notification primes the callback's view of the mute flag.
+                    hw.Write(id, !hw.Read(id));
+                    Assert.True(SpinWait.SpinUntil(() => notifications > 0, 2000));
+                    Thread.Sleep(300);
+                    int before = Volatile.Read(ref notifications);
+
+                    // Like a call app's automatic gain control.
+                    foreach (float level in new[] { 0.31f, 0.47f, 0.52f, 0.66f, 0.38f })
+                    {
+                        hw.WriteVolume(id, level);
+                        Thread.Sleep(60);
+                    }
+                    Thread.Sleep(400);
+                    Assert.Equal(before, Volatile.Read(ref notifications));
+
+                    hw.Write(id, !hw.Read(id));
+                    Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref notifications) > before, 2000), "mute change must notify");
+                }
+            }
+            finally
+            {
+                hw.WriteVolume(id, originalVolume);
             }
         }
 

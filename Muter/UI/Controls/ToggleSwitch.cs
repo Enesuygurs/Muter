@@ -26,7 +26,6 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.SupportsTransparentBackColor, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);
             BackColor = Theme.Surface;
-            Cursor = Cursors.Hand;
             Size = new Size(50, 30);
             animation.Tick += (s, e) => Animate();
         }
@@ -105,7 +104,6 @@ namespace Muter.UI.Controls
 
         protected override void OnEnabledChanged(EventArgs e)
         {
-            Cursor = Enabled ? Cursors.Hand : Cursors.Default;
             Invalidate();
             base.OnEnabledChanged(e);
         }

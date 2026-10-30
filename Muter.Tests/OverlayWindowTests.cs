@@ -145,7 +145,7 @@ namespace Muter.Tests
             settings.Reset();
             settings.overlayDurationMs = 5000;
             FakeAudioEndpointProvider providerCopy = provider;
-            var app = new TrayApplicationContext(settings, () => providerCopy, new FakeGlobalHotkey(), new StartupRegistration(Application.ExecutablePath, @"Software\MuterTests\OverlayRun"));
+            var app = new TrayApplicationContext(settings, () => providerCopy, new FakeGlobalHotkey(), new StartupRegistration(Application.ExecutablePath, @"Software\MuterTests\OverlayRun"), TestSetup.Silent);
             app.WaitForAudio();
             return app;
         }

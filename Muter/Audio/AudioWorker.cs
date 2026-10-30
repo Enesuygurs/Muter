@@ -6,6 +6,14 @@ using System.Threading;
 
 namespace Muter.Audio
 {
+    // Why a status was produced.
+    internal enum StatusSource
+    {
+        Refresh,    // a poll or a notification
+        Setting,    // a settings change (target devices, sync)
+        MuteAction, // the user muted or unmuted (hotkey, tray click)
+    }
+
     // Runs every Core Audio call on one dedicated thread, so a slow or hung driver (e.g. a Bluetooth headset switching
     // profiles) can never freeze the UI: the UI keeps running and shows the state as unknown while a call is stuck.
     // The provider and the controller are created and used on this thread only.
@@ -37,8 +45,8 @@ namespace Muter.Audio
             thread.Start();
         }
 
-        // Raised on the worker thread after every operation: the fresh status and whether it came from a user toggle.
-        public event Action<MicrophoneStatus, bool> StatusAvailable;
+        // Raised on the worker thread after every operation: the fresh status and what produced it.
+        public event Action<MicrophoneStatus, StatusSource> StatusAvailable;
 
         // How long the current operation has been running (zero when idle).
         public TimeSpan BusyFor
@@ -57,7 +65,7 @@ namespace Muter.Audio
             if (!Enqueue(() =>
             {
                 Interlocked.Exchange(ref refreshQueued, 0);
-                Report(Controller()?.Refresh(), userAction: false);
+                Report(Controller()?.Refresh(), StatusSource.Refresh);
             }))
             {
                 Interlocked.Exchange(ref refreshQueued, 0);
@@ -72,12 +80,12 @@ namespace Muter.Audio
         }
 
         // Every call is one toggle; presses are never merged.
-        public void Toggle() => Enqueue(() => Report(Controller()?.ToggleMute(), userAction: true));
+        public void Toggle() => Enqueue(() => Report(Controller()?.ToggleMute(), StatusSource.MuteAction));
 
         public void SetTarget(string deviceId) => Enqueue(() =>
         {
             targetDeviceId = deviceId;
-            Report(Controller()?.SetTarget(deviceId), userAction: true);
+            Report(Controller()?.SetTarget(deviceId), StatusSource.Setting);
         });
 
         public void SetSync(bool enabled) => Enqueue(() =>
@@ -86,7 +94,7 @@ namespace Muter.Audio
             MicrophoneController c = Controller();
             if (c != null)
                 c.SyncDevices = enabled;
-            Report(c?.Refresh(), userAction: true);
+            Report(c?.Refresh(), StatusSource.Setting);
         });
 
         // Lists the microphones for the menu. Throws TimeoutException if the audio system does not answer in time.
@@ -213,11 +221,11 @@ namespace Muter.Audio
             }
         }
 
-        private void Report(MicrophoneStatus status, bool userAction)
+        private void Report(MicrophoneStatus status, StatusSource source)
         {
             try
             {
-                StatusAvailable?.Invoke(status ?? MicrophoneStatus.ReadFailure, userAction);
+                StatusAvailable?.Invoke(status ?? MicrophoneStatus.ReadFailure, source);
             }
             catch (Exception ex)
             {

@@ -60,6 +60,7 @@ namespace Muter.UI
             content = new Panel { Location = new Point(196, TitleBarHeight), Size = new Size(508, WindowHeight - TitleBarHeight - 16), BackColor = Theme.Background };
             Controls.Add(content);
             BuildGeneralPage();
+            BuildHotkeyPage();
             BuildOverlayPage();
             BuildMiniIndicatorPage();
             ResumeLayout(false);
@@ -82,6 +83,8 @@ namespace Muter.UI
         internal FlatButton ChangeHotkeyButton { get; private set; }
 
         internal ToggleSwitch StartupToggle { get; private set; }
+
+        internal ToggleSwitch SoundToggle { get; private set; }
 
         internal ToggleSwitch ShowOverlayToggle { get; private set; }
 
@@ -207,7 +210,7 @@ namespace Muter.UI
         private void BuildNavigation()
         {
             int y = TitleBarHeight + 4;
-            foreach (var entry in new[] { ("General", ""), ("Overlay", ""), ("Mini indicator", "") })
+            foreach (var entry in new[] { ("General", ""), ("Hotkey", ""), ("Overlay", ""), ("Mini indicator", "") })
             {
                 string page = entry.Item1;
                 var button = new NavButton { Text = page, Glyph = entry.Item2, Location = new Point(12, y), Size = new Size(172, 38) };
@@ -305,15 +308,6 @@ namespace Muter.UI
             StartupToggle = new ToggleSwitch();
             StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
             AddRow(page, "Start with Windows", "Run Muter when you sign in", StartupToggle, ref y);
-            y += 6;
-            AddSection(page, "Hotkey", ref y);
-            var hotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
-            HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Cursor = Cursors.Default, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
-            ChangeHotkeyButton = new FlatButton { Text = "Change", Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
-            ChangeHotkeyButton.Click += (s, e) => app.OpenHotkeyDialog(this);
-            hotkeyPanel.Controls.Add(HotkeyKeys);
-            hotkeyPanel.Controls.Add(ChangeHotkeyButton);
-            AddRow(page, "Mute hotkey", "Mutes and unmutes from any app", hotkeyPanel, ref y);
 
             // Settings shared by the overlay and the mini indicator.
             y += 6;
@@ -332,6 +326,26 @@ namespace Muter.UI
             positionsPanel.Controls.Add(ResetPositionsButton);
             positionsRow = AddRow(page, "Positions", string.Empty, positionsPanel, ref y);
 
+        }
+
+        private void BuildHotkeyPage()
+        {
+            Panel page = NewPage("Hotkey", out int y);
+
+            AddSection(page, "Hotkey", ref y);
+            var hotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
+            HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Cursor = Cursors.Default, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ChangeHotkeyButton = new FlatButton { Text = "Change", Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ChangeHotkeyButton.Click += (s, e) => app.OpenHotkeyDialog(this);
+            hotkeyPanel.Controls.Add(HotkeyKeys);
+            hotkeyPanel.Controls.Add(ChangeHotkeyButton);
+            AddRow(page, "Mute hotkey", "Mutes and unmutes from any app", hotkeyPanel, ref y);
+
+            y += 6;
+            AddSection(page, "Sound", ref y);
+            SoundToggle = new ToggleSwitch();
+            SoundToggle.Toggled += (s, e) => Apply(() => app.SetSoundFeedback(SoundToggle.Checked));
+            AddRow(page, "Sound feedback", "A short sound when the microphone is turned on or off", SoundToggle, ref y);
         }
 
         private void BuildOverlayPage()
@@ -416,6 +430,7 @@ namespace Muter.UI
                 SyncToggle.Checked = settings.syncDevices;
                 HotkeyKeys.Keycaps = HotkeyText.Parts(app.ConfiguredHotkey);
                 StartupToggle.Checked = app.IsStartupEnabled();
+                SoundToggle.Checked = settings.soundFeedback;
 
                 ShowOverlayToggle.Checked = settings.showGui;
                 PositionDropdown.SelectedValue = OverlayPlacement.ParseEnum(settings.overlayPosition, OverlayAnchor.LowerCenter);

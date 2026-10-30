@@ -52,6 +52,7 @@ namespace Muter.UI
         // A plain hidden top-level window, so "taskkill" always finds a window of ours to send its close request to.
         private readonly NativeWindow closeTarget = new NativeWindow();
         private readonly Action<FeedbackSound> playSound;
+        private readonly KeyReleaseWatcher pushToTalkRelease;
         private readonly bool realSounds;
         private volatile bool soundEnabled;
         private MicrophoneStatus status = MicrophoneStatus.ReadFailure;
@@ -65,9 +66,9 @@ namespace Muter.UI
         private bool shutDown;
         private SettingsForm settingsForm;
 
-        // playSound: tests replace the real sounds.
+        // playSound and isKeyDown: tests replace the real sounds and the real keyboard.
         public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup,
-            Action<FeedbackSound> playSound = null)
+            Action<FeedbackSound> playSound = null, Func<Keys, bool> isKeyDown = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.playSound = playSound ?? FeedbackSounds.Play;
@@ -115,7 +116,9 @@ namespace Muter.UI
                 Post(() => OnStatus(newStatus, source));
             };
 
-            hotkey.Pressed += (s, e) => ToggleMute();
+            // The release is handled off the UI thread and goes straight to the audio thread.
+            pushToTalkRelease = new KeyReleaseWatcher(() => audio.SetMuted(true, StatusSource.MuteAction), isKeyDown);
+            hotkey.Pressed += (s, e) => OnHotkeyPressed();
             pollTimer.Tick += (s, e) => OnPoll();
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
@@ -130,6 +133,11 @@ namespace Muter.UI
 
             // Until the first reading arrives the tray shows "unknown"; the overlay appears with the first real state.
             UpdateUi(forceOverlay: false, initial: true);
+            if (settings.pushToTalk)
+            {
+                Log.Info("Push to talk is on: muting");
+                audio.SetMuted(true, StatusSource.Setting);
+            }
             if (realSounds && settings.soundFeedback)
                 FeedbackSounds.Prepare();
             audio.RequestRefresh();
@@ -174,6 +182,35 @@ namespace Muter.UI
         {
             if (!shutDown)
                 audio.Toggle();
+        }
+
+        private void OnHotkeyPressed()
+        {
+            if (shutDown)
+                return;
+            if (!settings.pushToTalk)
+            {
+                ToggleMute();
+                return;
+            }
+            // Unmute first, then watch: the mute for the release is always queued after this unmute.
+            audio.SetMuted(false, StatusSource.MuteAction);
+            pushToTalkRelease.Start(configuredHotkey.Key);
+        }
+
+        internal bool PushToTalkHeld => pushToTalkRelease.Watching;
+
+        internal void SetPushToTalk(bool enabled)
+        {
+            settings.pushToTalk = enabled;
+            SaveSettings();
+            pushToTalkRelease.Stop();
+            if (enabled)
+            {
+                // Muted is the resting state of push to talk.
+                Log.Info("Push to talk turned on: muting");
+                audio.SetMuted(true, StatusSource.Setting);
+            }
         }
 
         internal void RefreshNow()
@@ -902,6 +939,13 @@ namespace Muter.UI
             shutDown = true;
 
             pollTimer.Stop();
+            // Exiting while the push-to-talk key is held: mute before the audio thread stops (it finishes its queue).
+            if (pushToTalkRelease.Stop())
+            {
+                Log.Info("Exiting while push to talk is held: muting");
+                audio.SetMuted(true, StatusSource.MuteAction);
+            }
+            pushToTalkRelease.Dispose();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             Application.RemoveMessageFilter(closeRequestFilter);

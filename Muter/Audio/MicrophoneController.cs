@@ -91,6 +91,26 @@ namespace Muter.Audio
             return Publish(Evaluate());
         }
 
+        // Push to talk: mutes or unmutes every targeted microphone, then reports the state read back from them.
+        public MicrophoneStatus SetMute(bool mute)
+        {
+            Snapshot snapshot;
+            try
+            {
+                snapshot = ReadSnapshot();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"{(mute ? "Mute" : "Unmute")} failed: the microphones could not be read", ex);
+                return Publish(Fail());
+            }
+
+            if (snapshot.Targets.Count > 0)
+                Apply(snapshot, mute, onlyDifferent: false);
+
+            return Publish(Evaluate());
+        }
+
         private MicrophoneStatus Evaluate()
         {
             Snapshot snapshot;

@@ -286,5 +286,17 @@ namespace Muter.Properties {
                 this["soundFeedback"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool pushToTalk {
+            get {
+                return ((bool)(this["pushToTalk"]));
+            }
+            set {
+                this["pushToTalk"] = value;
+            }
+        }
     }
 }

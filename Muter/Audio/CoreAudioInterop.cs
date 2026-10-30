@@ -9,6 +9,7 @@ namespace Muter.Audio
     internal static class CoreAudioInterop
     {
         public const int S_OK = 0;
+        public const int S_FALSE = 1;
         public const int E_NOTFOUND = unchecked((int)0x80070490);
         public const uint DEVICE_STATE_ACTIVE = 0x00000001;
         public const uint CLSCTX_ALL = 0x17;
@@ -29,6 +30,9 @@ namespace Muter.Audio
             Type type = Type.GetTypeFromCLSID(CLSID_MMDeviceEnumerator, throwOnError: true);
             return (IMMDeviceEnumerator)Activator.CreateInstance(type);
         }
+
+        // Like the SUCCEEDED macro: S_FALSE (1) is success too - SetMute returns it when the state did not change.
+        public static bool Succeeded(int hr) => hr >= 0;
 
         public static void Release(object comObject)
         {

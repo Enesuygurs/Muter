@@ -51,10 +51,11 @@ namespace Muter.Audio
         // Keeps every targeted microphone in the same mute state when they drift apart (e.g. changed in Windows).
         public bool SyncDevices { get; set; }
 
+        // The last known mute states are kept, so with sync on the newly targeted microphones follow the ones that were
+        // controlled until now instead of an arbitrary device.
         public MicrophoneStatus SetTarget(string deviceId)
         {
             targetDeviceId = Normalize(deviceId);
-            lastKnownMute.Clear();
             rewatchRequested = true;
             return Refresh();
         }
@@ -98,7 +99,7 @@ namespace Muter.Audio
                 snapshot = ReadSnapshot();
                 if (SyncDevices && snapshot.IsMixed)
                 {
-                    bool mute = DecideSyncTarget(snapshot.Readable(), lastKnownMute, TryGetDefaultConsoleId());
+                    bool mute = DecideSyncTarget(snapshot.Readable(), lastKnownMute);
                     Log.Info($"Sync: setting {snapshot.Targets.Count} microphones to {(mute ? "muted" : "unmuted")}");
                     Apply(snapshot, mute, onlyDifferent: true);
                     snapshot = ReadSnapshot();
@@ -121,9 +122,9 @@ namespace Muter.Audio
         // Which state mixed microphones are synced to:
         //  1. A microphone that changed since the last refresh (someone toggled it) - the others follow it.
         //  2. Otherwise newly connected microphones follow the ones that were already known.
-        //  3. Otherwise the default recording device decides; if that is unavailable, mute.
+        //  3. Otherwise (no history, e.g. right after start) mute: when unsure, never open a microphone.
         // Conflicting signals resolve to muted.
-        internal static bool DecideSyncTarget(IReadOnlyDictionary<string, bool> current, IReadOnlyDictionary<string, bool> previous, string defaultConsoleId)
+        internal static bool DecideSyncTarget(IReadOnlyDictionary<string, bool> current, IReadOnlyDictionary<string, bool> previous)
         {
             List<bool> changed = current
                 .Where(p => previous.TryGetValue(p.Key, out bool old) && old != p.Value)
@@ -140,9 +141,6 @@ namespace Muter.Audio
                 .ToList();
             if (known.Count == 1)
                 return known[0];
-
-            if (defaultConsoleId != null && current.TryGetValue(defaultConsoleId, out bool defaultMute))
-                return defaultMute;
 
             return true;
         }
@@ -193,9 +191,11 @@ namespace Muter.Audio
                 foreach (EndpointRole role in DefaultRoles)
                 {
                     string id = provider.GetDefaultCaptureEndpointId(role);
-                    AudioEndpointInfo endpoint = id == null ? null : active.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
-                    if (endpoint != null && !targets.Contains(endpoint))
-                        targets.Add(endpoint);
+                    if (id == null || targets.Any(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+                    // A default missing from the list read a moment ago (it just appeared or vanished) is still
+                    // targeted: it is read directly, and if it cannot be read the state becomes Unknown.
+                    targets.Add(active.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase)) ?? new AudioEndpointInfo(id, null));
                 }
             }
             catch (Exception ex)
@@ -231,7 +231,9 @@ namespace Muter.Audio
         {
             foreach (AudioEndpointInfo target in snapshot.Targets)
             {
-                if (onlyDifferent && snapshot.Readings[target.Id] == mute)
+                // Sync never unmutes a microphone whose state it could not read.
+                bool? reading = snapshot.Readings[target.Id];
+                if (onlyDifferent && (reading == mute || (reading == null && !mute)))
                     continue;
 
                 for (int attempt = 1; ; attempt++)
@@ -253,19 +255,6 @@ namespace Muter.Audio
             }
         }
 
-        private string TryGetDefaultConsoleId()
-        {
-            try
-            {
-                return provider.GetDefaultCaptureEndpointId(EndpointRole.Console);
-            }
-            catch (Exception ex)
-            {
-                Log.Warn("Could not read the default recording device", ex);
-                return null;
-            }
-        }
-
         private void EnsureWatching(Snapshot snapshot)
         {
             var ids = new HashSet<string>(snapshot.Targets.Select(t => t.Id), StringComparer.OrdinalIgnoreCase);
@@ -284,9 +273,9 @@ namespace Muter.Audio
             }
         }
 
+        // The last good readings are kept: a single failed read must not erase which microphone changed last.
         private MicrophoneStatus Fail()
         {
-            lastKnownMute.Clear();
             rewatchRequested = true;
             return MicrophoneStatus.ReadFailure;
         }

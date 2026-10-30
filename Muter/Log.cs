@@ -6,7 +6,7 @@ using System.Text;
 namespace Muter
 {
     // Small thread-safe file logger (%LOCALAPPDATA%\Muter\muter.log). It never throws, rotates at 1 MB and
-    // suppresses identical messages repeated within a minute so polling failures cannot flood the disk.
+    // suppresses identical warnings/errors repeated within a minute so polling failures cannot flood the disk.
     internal static class Log
     {
         private const long MaxFileSize = 1024 * 1024;
@@ -59,11 +59,15 @@ namespace Muter
 
                 lock (sync)
                 {
-                    if (lastWritten.TryGetValue(key, out DateTime last) && now - last < RepeatWindow)
-                        return;
-                    lastWritten[key] = now;
-                    if (lastWritten.Count > 500)
-                        lastWritten.Clear();
+                    // Only repeated problems are suppressed; every INFO line (state changes, toggles) is kept.
+                    if (level != "INFO")
+                    {
+                        if (lastWritten.TryGetValue(key, out DateTime last) && now - last < RepeatWindow)
+                            return;
+                        lastWritten[key] = now;
+                        if (lastWritten.Count > 500)
+                            lastWritten.Clear();
+                    }
 
                     var line = new StringBuilder();
                     line.Append(now.ToString("yyyy-MM-dd HH:mm:ss.fff")).Append(" [").Append(level).Append("] ").Append(message).Append(detail);

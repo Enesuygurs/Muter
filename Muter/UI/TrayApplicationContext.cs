@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
@@ -15,13 +16,19 @@ using Timer = System.Windows.Forms.Timer;
 
 namespace Muter.UI
 {
-    // The application: tray icon and menu, global hotkey, overlay windows and the microphone controller.
-    // Everything runs on the UI thread; audio callbacks from other threads are posted here.
+    // The application: tray icon and menu, global hotkey and overlay windows. The microphones are handled by an
+    // AudioWorker on its own thread and its results are posted here, so a stuck audio call cannot freeze the UI; it is
+    // shown as UNKNOWN instead of leaving the last state on screen.
     internal sealed class TrayApplicationContext : ApplicationContext
     {
         // Safety net in case a Windows notification is missed. Each poll re-reads every targeted device.
         public const int PollIntervalMs = 1000;
-        private const int DeviceChangeDelayMs = 300;
+
+        // An audio call running longer than this is shown as "not responding" (UNKNOWN).
+        public const int NotRespondingMs = 2000;
+
+        // Every this many polls the tray icon is re-sent to Explorer, so a lost update cannot stay on screen.
+        private const int TrayResendPolls = 10;
         private static readonly int[] DisplayTimeChoicesMs = { 500, 1000, 2000, 3000, 5000, StatusOverlayForm.AlwaysVisible };
         private static readonly OverlayAnchor[] MiniIndicatorAnchors =
         {
@@ -30,47 +37,49 @@ namespace Muter.UI
         };
 
         private readonly Settings settings;
-        private readonly IAudioEndpointProvider provider;
+        private readonly AudioWorker audio;
         private readonly IGlobalHotkey hotkey;
         private readonly StartupRegistration startup;
-        private readonly MicrophoneController controller;
         private readonly StatusOverlayForm overlay;
         private readonly MiniIndicatorForm miniIndicator;
         private readonly NotifyIcon trayIcon;
         private readonly ContextMenuStrip menu;
         private readonly Font menuFont = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
         private readonly Timer pollTimer = new Timer { Interval = PollIntervalMs };
-        private readonly Timer deviceChangeTimer = new Timer { Interval = DeviceChangeDelayMs };
         private readonly SynchronizationContext uiContext;
+        private readonly CloseRequestFilter closeRequestFilter;
+        // A plain hidden top-level window, so "taskkill" always finds a window of ours to send its close request to.
+        private readonly NativeWindow closeTarget = new NativeWindow();
+        private MicrophoneStatus status = MicrophoneStatus.ReadFailure;
+        private bool audioNotResponding;
         private Hotkey configuredHotkey;
         private MicState? lastShownState;
-        private int refreshQueued;
+        private int pollCount;
+        private bool alternateTrayIcons;
         private bool moveMode;
         private bool hotkeyDialogOpen;
         private bool shutDown;
 
-        public TrayApplicationContext(Settings settings, IAudioEndpointProvider provider, IGlobalHotkey hotkey, StartupRegistration startup)
+        public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            this.provider = provider ?? throw new ArgumentNullException(nameof(provider));
             this.hotkey = hotkey ?? throw new ArgumentNullException(nameof(hotkey));
             this.startup = startup ?? throw new ArgumentNullException(nameof(startup));
+            if (providerFactory == null)
+                throw new ArgumentNullException(nameof(providerFactory));
 
-            // Creating the first control installs the WindowsFormsSynchronizationContext for this thread.
+            // Creating the first control installs the WindowsFormsSynchronizationContext for this thread. The window
+            // handles are created right away so close requests (taskkill, sign-out) always find them.
             overlay = new StatusOverlayForm();
             miniIndicator = new MiniIndicatorForm();
+            GC.KeepAlive(overlay.Handle);
+            GC.KeepAlive(miniIndicator.Handle);
+            closeTarget.CreateHandle(new CreateParams { Caption = "Muter" });
             uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
             overlay.Dragged += (s, e) => SaveCustomPosition(forOverlay: true, e);
             miniIndicator.Dragged += (s, e) => SaveCustomPosition(forOverlay: false, e);
-            // A close request from outside (taskkill, Windows sign-out) exits the whole app cleanly instead of
-            // leaving it running without its overlay windows.
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
-
-            controller = new MicrophoneController(provider, settings.selectedDeviceId, settings.syncDevices);
-            controller.StatusChanged += (s, e) => UpdateUi(forceOverlay: false);
-            provider.DevicesChanged += OnDevicesChanged;
-            provider.MuteStateChanged += OnMuteStateChanged;
 
             menu = new ContextMenuStrip { Font = menuFont };
             menu.Opening += (s, e) =>
@@ -78,37 +87,42 @@ namespace Muter.UI
                 RebuildMenu();
                 e.Cancel = false;
             };
-            RebuildMenu();
 
-            trayIcon = new NotifyIcon { ContextMenuStrip = menu, Icon = AppResources.TrayLive, Text = "Muter", Visible = true };
+            trayIcon = new NotifyIcon { ContextMenuStrip = menu, Icon = AppResources.TrayIcon(StatusVisual.Unknown, false), Text = "Muter", Visible = true };
             trayIcon.MouseClick += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left)
                     ToggleMute();
             };
 
+            audio = new AudioWorker(providerFactory, settings.selectedDeviceId, settings.syncDevices);
+            audio.StatusAvailable += (newStatus, userAction) => Post(() => OnStatus(newStatus, userAction));
+
             hotkey.Pressed += (s, e) => ToggleMute();
             pollTimer.Tick += (s, e) => OnPoll();
-            deviceChangeTimer.Tick += (s, e) =>
-            {
-                deviceChangeTimer.Stop();
-                RefreshNow();
-            };
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
+            Application.AddMessageFilter(closeRequestFilter = new CloseRequestFilter(this));
 
             ApplyOverlaySettings();
             RegisterConfiguredHotkey(notifyOnFailure: true);
             RepairStartupEntry();
+            RebuildMenu();
             Log.Info($"DPI awareness: {DpiHelper.DescribeProcessAwareness()}; screens: "
                 + string.Join(", ", ScreenInfo.All().Select(s => $"{s.DeviceName} {s.Bounds.Width}x{s.Bounds.Height} at {DpiHelper.GetScale(s):0.##}x")));
 
-            RefreshNow();
-            UpdateUi(forceOverlay: true);
+            // Until the first reading arrives the tray shows "unknown"; the overlay appears with the first real state.
+            UpdateUi(forceOverlay: false, initial: true);
+            audio.RequestRefresh();
             pollTimer.Start();
         }
 
-        internal MicrophoneController Controller => controller;
+        // Latest state reported by the audio thread.
+        internal MicrophoneStatus Status => status;
+
+        internal bool AudioNotResponding => audioNotResponding;
+
+        internal bool IsAllDevicesMode => settings.selectedDeviceId == MicrophoneController.AllDevicesId;
 
         internal StatusOverlayForm OverlayWindow => overlay;
 
@@ -120,34 +134,28 @@ namespace Muter.UI
 
         internal bool PositionsUnlocked => moveMode;
 
+        internal IntPtr CloseRequestWindow => closeTarget.Handle;
+
+        // For tests: waits for queued audio work and delivers its results to the UI.
+        internal bool WaitForAudio(int timeoutMs = 3000)
+        {
+            bool idle = audio.WaitIdle(timeoutMs);
+            for (int i = 0; i < 5; i++)
+                Application.DoEvents();
+            return idle;
+        }
+
         // Shared by the hotkey and a left click on the tray icon.
         internal void ToggleMute()
         {
-            if (shutDown)
-                return;
-            try
-            {
-                controller.ToggleMute();
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Toggling the microphone failed", ex);
-            }
-            UpdateUi(forceOverlay: true);
+            if (!shutDown)
+                audio.Toggle();
         }
 
         internal void RefreshNow()
         {
-            if (shutDown)
-                return;
-            try
-            {
-                controller.Refresh();
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Refreshing the microphone state failed", ex);
-            }
+            if (!shutDown)
+                audio.RequestRefresh();
         }
 
         // Rebuilds the tray menu so every check mark reflects the current settings and devices.
@@ -179,64 +187,83 @@ namespace Muter.UI
             base.Dispose(disposing);
         }
 
-        private void UpdateUi(bool forceOverlay)
+        private void OnStatus(MicrophoneStatus newStatus, bool userAction)
+        {
+            status = newStatus;
+            if (audioNotResponding)
+                Log.Info("Audio system responding again");
+            audioNotResponding = false;
+            UpdateUi(forceOverlay: userAction);
+        }
+
+        // Puts the current state on every surface. Each surface is updated independently so a failure in one cannot
+        // leave another showing an old state; it is called again on every poll.
+        private void UpdateUi(bool forceOverlay, bool initial = false)
         {
             if (shutDown)
                 return;
 
-            MicrophoneStatus status = controller.Status;
-            StatusPresentation presentation = StatusPresentation.From(status, controller.IsAllDevicesMode);
+            StatusPresentation presentation = audioNotResponding
+                ? StatusPresentation.NotResponding(IsAllDevicesMode)
+                : StatusPresentation.From(status, IsAllDevicesMode);
 
-            trayIcon.Icon = presentation.ShowsMuted ? AppResources.TrayMuted
-                : presentation.Visual == StatusVisual.NoDevice ? AppResources.TrayNoDevice
-                : AppResources.TrayLive;
-            trayIcon.Text = presentation.Tooltip;
-            overlay.SetPresentation(presentation);
-            miniIndicator.SetPresentation(presentation);
+            Safely("tray icon", () =>
+            {
+                trayIcon.Icon = AppResources.TrayIcon(presentation.Visual, alternateTrayIcons);
+                trayIcon.Text = presentation.Tooltip;
+            });
+            Safely("overlay", () => overlay.SetPresentation(presentation));
+            Safely("mini indicator", () => miniIndicator.SetPresentation(presentation));
 
-            bool stateChanged = lastShownState != status.State;
-            lastShownState = status.State;
+            if (initial)
+                return;
+            bool stateChanged = lastShownState != presentation.Visual.ToState();
+            lastShownState = presentation.Visual.ToState();
             if (forceOverlay || stateChanged)
-                overlay.ShowTransient();
+                Safely("overlay", overlay.ShowTransient);
         }
 
         private void OnPoll()
         {
-            RefreshNow();
             if (shutDown)
                 return;
+
+            if (audio.BusyFor.TotalMilliseconds > NotRespondingMs)
+            {
+                if (!audioNotResponding)
+                    Log.Warn($"The audio system has not answered for {audio.BusyFor.TotalSeconds:0.#} s; showing the state as unknown");
+                audioNotResponding = true;
+            }
+            else
+            {
+                audio.RequestRefresh();
+            }
+
+            if (++pollCount % TrayResendPolls == 0)
+                alternateTrayIcons = !alternateTrayIcons;
+            UpdateUi(forceOverlay: false);
+
             // Keep always-visible windows above other topmost windows and on the monitor under the mouse if configured.
-            miniIndicator.ApplyVisibility();
+            Safely("mini indicator", miniIndicator.ApplyVisibility);
             if (overlay.Visible && (overlay.MoveMode || overlay.DisplayTimeMs == StatusOverlayForm.AlwaysVisible))
             {
-                overlay.UpdateLayout();
-                overlay.ShowOnTop();
+                Safely("overlay", () =>
+                {
+                    overlay.UpdateLayout();
+                    overlay.ShowOnTop();
+                });
             }
         }
 
-        // Called on a Windows audio thread.
-        private void OnDevicesChanged(object sender, EventArgs e)
+        private static void Safely(string what, Action action)
         {
-            Post(() =>
+            try
             {
-                controller.NotifyDevicesChanged();
-                deviceChangeTimer.Stop();
-                deviceChangeTimer.Start();
-            });
-        }
-
-        // Called on a Windows audio thread. Coalesces bursts of notifications into one refresh.
-        private void OnMuteStateChanged(object sender, EventArgs e)
-        {
-            if (Interlocked.Exchange(ref refreshQueued, 1) != 0)
-                return;
-            if (!Post(() =>
+                action();
+            }
+            catch (Exception ex)
             {
-                Interlocked.Exchange(ref refreshQueued, 0);
-                RefreshNow();
-            }))
-            {
-                Interlocked.Exchange(ref refreshQueued, 0);
+                Log.Error($"Updating the {what} failed", ex);
             }
         }
 
@@ -254,14 +281,14 @@ namespace Muter.UI
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("Handling an audio notification failed", ex);
+                        Log.Error("Handling a background notification failed", ex);
                     }
                 }, null);
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Warn("Could not post an audio notification to the UI thread", ex);
+                Log.Warn("Could not post a notification to the UI thread", ex);
                 return false;
             }
         }
@@ -270,9 +297,49 @@ namespace Muter.UI
         {
             if (shutDown)
                 return;
+            if (e.CloseReason == CloseReason.WindowsShutDown)
+            {
+                // Never block sign-out or shutdown: allow it and clean up.
+                Log.Info("Windows is signing out or shutting down; exiting");
+                Post(ExitThread);
+                return;
+            }
             e.Cancel = true;
-            Log.Info($"Close requested ({e.CloseReason}); exiting");
+            RequestExit(e.CloseReason.ToString());
+        }
+
+        private void RequestExit(string reason)
+        {
+            Log.Info($"Close requested ({reason}); exiting");
             Post(ExitThread);
+        }
+
+        // "taskkill" (without /F) posts WM_CLOSE to one hidden top-level window of the process that it picks itself
+        // (measured: one of the WinForms helper windows, e.g. the tray icon's). A WM_CLOSE posted to any live window of
+        // ours therefore means "please exit": it is swallowed (so the helper window is not destroyed, which would break
+        // the tray icon) and the app exits cleanly. The hotkey dialog and other forms close normally. A window that is
+        // no longer registered (a collected NativeWindow posts WM_CLOSE to itself for cleanup) is left alone.
+        private sealed class CloseRequestFilter : IMessageFilter
+        {
+            private const int WM_CLOSE = 0x0010;
+            private readonly TrayApplicationContext owner;
+
+            public CloseRequestFilter(TrayApplicationContext owner) => this.owner = owner;
+
+            public bool PreFilterMessage(ref Message m)
+            {
+                if (m.Msg != WM_CLOSE || owner.shutDown)
+                    return false;
+
+                Control control = Control.FromHandle(m.HWnd);
+                if (control is Form form && form != owner.overlay && form != owner.miniIndicator)
+                    return false;
+                if (control == null && NativeWindow.FromHandle(m.HWnd) == null)
+                    return false;
+
+                owner.RequestExit("WM_CLOSE");
+                return true;
+            }
         }
 
         private void OnDisplaySettingsChanged(object sender, EventArgs e)
@@ -290,8 +357,7 @@ namespace Muter.UI
                 return;
             Post(() =>
             {
-                controller.NotifyDevicesChanged();
-                RefreshNow();
+                audio.NotifyDevicesChanged();
                 RegisterConfiguredHotkey(notifyOnFailure: true);
             });
         }
@@ -301,17 +367,18 @@ namespace Muter.UI
         private ToolStripMenuItem BuildDevicesMenu()
         {
             var devicesMenu = Submenu("Devices");
-            string selectedId = controller.TargetDeviceId;
+            string selectedId = settings.selectedDeviceId;
+            bool isDefault = string.IsNullOrWhiteSpace(selectedId);
 
-            devicesMenu.DropDownItems.Add(Item("Default (System)", controller.IsDefaultMode, () => SelectDevice(null, "Default (System)"),
+            devicesMenu.DropDownItems.Add(Item("Default (System)", isDefault, () => SelectDevice(null, "Default (System)"),
                 "The default recording device and the default communications device."));
-            devicesMenu.DropDownItems.Add(Item("All Devices", controller.IsAllDevicesMode, () => SelectDevice(MicrophoneController.AllDevicesId, "All Devices")));
+            devicesMenu.DropDownItems.Add(Item("All Devices", IsAllDevicesMode, () => SelectDevice(MicrophoneController.AllDevicesId, "All Devices")));
             devicesMenu.DropDownItems.Add(new ToolStripSeparator());
 
-            bool selectedFound = controller.IsDefaultMode || controller.IsAllDevicesMode;
+            bool selectedFound = isDefault || IsAllDevicesMode;
             try
             {
-                IReadOnlyList<AudioEndpointInfo> devices = controller.GetCaptureDevices();
+                IReadOnlyList<AudioEndpointInfo> devices = audio.GetDevices(timeoutMs: 1000);
                 foreach (AudioEndpointInfo device in devices)
                 {
                     bool isSelected = string.Equals(device.Id, selectedId, StringComparison.OrdinalIgnoreCase);
@@ -342,20 +409,18 @@ namespace Muter.UI
             settings.selectedDeviceId = deviceId ?? string.Empty;
             settings.selectedDeviceName = deviceName ?? string.Empty;
             SaveSettings();
-            controller.SetTarget(deviceId);
-            UpdateUi(forceOverlay: true);
+            audio.SetTarget(deviceId);
         }
 
         private void ToggleSyncDevices()
         {
             settings.syncDevices = !settings.syncDevices;
             SaveSettings();
-            controller.SyncDevices = settings.syncDevices;
-            RefreshNow();
-            UpdateUi(forceOverlay: true);
+            audio.SetSync(settings.syncDevices);
         }
 
         #endregion
+
 
         #region Overlay settings
 
@@ -584,7 +649,9 @@ namespace Muter.UI
 
         private void RegisterConfiguredHotkey(bool notifyOnFailure)
         {
-            configuredHotkey = Hotkey.TryFromSettings(settings.hotkeyKey, settings.hotkeyModifiers, out Hotkey fromSettings)
+            if (shutDown)
+                return;
+            configuredHotkey =Hotkey.TryFromSettings(settings.hotkeyKey, settings.hotkeyModifiers, out Hotkey fromSettings)
                 ? fromSettings
                 : Hotkey.Default;
             if (hotkey.IsRegistered && hotkey.Current.Equals(configuredHotkey))
@@ -716,6 +783,8 @@ namespace Muter.UI
 
         private void ShowBalloon(string title, string text, ToolTipIcon icon)
         {
+            if (shutDown)
+                return;
             try
             {
                 trayIcon?.ShowBalloonTip(5000, title, text, icon);
@@ -733,13 +802,12 @@ namespace Muter.UI
             shutDown = true;
 
             pollTimer.Stop();
-            deviceChangeTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            Application.RemoveMessageFilter(closeRequestFilter);
+            closeTarget.DestroyHandle();
             overlay.FormClosing -= OnOverlayClosing;
             miniIndicator.FormClosing -= OnOverlayClosing;
-            provider.DevicesChanged -= OnDevicesChanged;
-            provider.MuteStateChanged -= OnMuteStateChanged;
 
             try
             {
@@ -757,17 +825,10 @@ namespace Muter.UI
             overlay.Dispose();
             miniIndicator.Dispose();
             pollTimer.Dispose();
-            deviceChangeTimer.Dispose();
             menuFont.Dispose();
 
-            try
-            {
-                provider.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Log.Warn("Could not release the audio devices", ex);
-            }
+            // Stops the audio thread, which releases the devices; never blocks exit for long.
+            audio.Dispose();
         }
 
         #endregion

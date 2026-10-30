@@ -9,8 +9,7 @@ namespace Muter.Audio
     internal sealed class CoreAudioEndpointProvider : IAudioEndpointProvider
     {
         private readonly NotificationClient notificationClient;
-        private readonly VolumeCallback volumeCallback;
-        private readonly Dictionary<string, IAudioEndpointVolume> watchedVolumes = new Dictionary<string, IAudioEndpointVolume>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, VolumeCallback> watchedVolumes = new Dictionary<string, VolumeCallback>(StringComparer.OrdinalIgnoreCase);
         private IMMDeviceEnumerator enumerator;
         private bool notificationsRegistered;
         private bool disposed;
@@ -18,7 +17,6 @@ namespace Muter.Audio
         public CoreAudioEndpointProvider()
         {
             notificationClient = new NotificationClient(this);
-            volumeCallback = new VolumeCallback(this);
             enumerator = CoreAudioInterop.CreateDeviceEnumerator();
             RegisterDeviceNotifications();
         }
@@ -88,8 +86,9 @@ namespace Muter.Audio
                     Guid iid = CoreAudioInterop.IID_IAudioEndpointVolume;
                     Check(device.Activate(ref iid, CoreAudioInterop.CLSCTX_ALL, IntPtr.Zero, out volumeObject), "Activate");
                     var volume = (IAudioEndpointVolume)volumeObject;
-                    Check(volume.RegisterControlChangeNotify(volumeCallback), "RegisterControlChangeNotify");
-                    watchedVolumes[id] = volume;
+                    var callback = new VolumeCallback(this, volume);
+                    Check(volume.RegisterControlChangeNotify(callback), "RegisterControlChangeNotify");
+                    watchedVolumes[id] = callback;
                     volumeObject = null; // now owned by watchedVolumes
                 }
                 catch (Exception ex)
@@ -159,7 +158,10 @@ namespace Muter.Audio
                 object volumeObject = null;
                 try
                 {
-                    Check(e.GetDevice(deviceId, out device), "GetDevice", enumeratorFailure: true);
+                    int hr = e.GetDevice(deviceId, out device);
+                    if (hr == CoreAudioInterop.E_NOTFOUND)
+                        throw new AudioDeviceException("Device not found", hr); // the device is gone, the enumerator is fine
+                    Check(hr, "GetDevice", enumeratorFailure: true);
                     Check(device.GetState(out uint state), "GetState");
                     if ((state & CoreAudioInterop.DEVICE_STATE_ACTIVE) == 0)
                         throw new AudioDeviceException($"Device is not active (state 0x{state:X})");
@@ -205,12 +207,14 @@ namespace Muter.Audio
             CoreAudioInterop.Release(enumerator);
             enumerator = CoreAudioInterop.CreateDeviceEnumerator();
             RegisterDeviceNotifications();
+            // Mute watches may have died with the old audio service connection: let the controller re-subscribe.
+            RaiseDevicesChanged();
         }
 
         private void RegisterDeviceNotifications()
         {
             int hr = enumerator.RegisterEndpointNotificationCallback(notificationClient);
-            notificationsRegistered = hr == CoreAudioInterop.S_OK;
+            notificationsRegistered = CoreAudioInterop.Succeeded(hr);
             if (!notificationsRegistered)
                 Log.Warn($"Could not register for device notifications (HRESULT 0x{hr:X8}); relying on polling");
         }
@@ -236,13 +240,13 @@ namespace Muter.Audio
             {
                 try
                 {
-                    pair.Value.UnregisterControlChangeNotify(volumeCallback);
+                    pair.Value.Volume.UnregisterControlChangeNotify(pair.Value);
                 }
                 catch (Exception ex)
                 {
                     Log.Warn($"Could not unregister mute notifications of device {pair.Key}", ex);
                 }
-                CoreAudioInterop.Release(pair.Value);
+                CoreAudioInterop.Release(pair.Value.Volume);
             }
             watchedVolumes.Clear();
         }
@@ -269,10 +273,10 @@ namespace Muter.Audio
             var value = new PropVariant();
             try
             {
-                if (device.OpenPropertyStore(CoreAudioInterop.STGM_READ, out store) != CoreAudioInterop.S_OK || store == null)
+                if (!CoreAudioInterop.Succeeded(device.OpenPropertyStore(CoreAudioInterop.STGM_READ, out store)) || store == null)
                     return null;
                 PropertyKey key = CoreAudioInterop.PKEY_Device_FriendlyName;
-                if (store.GetValue(ref key, out value) != CoreAudioInterop.S_OK)
+                if (!CoreAudioInterop.Succeeded(store.GetValue(ref key, out value)))
                     return null;
                 return value.VarType == CoreAudioInterop.VT_LPWSTR && value.Data != IntPtr.Zero
                     ? Marshal.PtrToStringUni(value.Data)
@@ -303,7 +307,7 @@ namespace Muter.Audio
 
         private static void Check(int hr, string operation, bool enumeratorFailure = false)
         {
-            if (hr != CoreAudioInterop.S_OK)
+            if (!CoreAudioInterop.Succeeded(hr))
                 throw new AudioDeviceException(operation + " failed", hr, enumeratorFailure);
         }
 
@@ -377,16 +381,38 @@ namespace Muter.Audio
             }
         }
 
+        // One per watched device. Windows calls it for every volume change too (call apps' automatic gain control can
+        // do that many times a second), so it only signals when the mute flag differs from the last notification.
+        // A missed signal is harmless: the poll re-reads the devices every second.
         [ComVisible(true)]
         private sealed class VolumeCallback : IAudioEndpointVolumeCallback
         {
+            // AUDIO_VOLUME_NOTIFICATION_DATA: GUID guidEventContext (16 bytes), then BOOL bMuted.
+            private const int MutedOffset = 16;
             private readonly CoreAudioEndpointProvider owner;
+            private int lastMuted = -1;
 
-            public VolumeCallback(CoreAudioEndpointProvider owner) => this.owner = owner;
+            public VolumeCallback(CoreAudioEndpointProvider owner, IAudioEndpointVolume volume)
+            {
+                this.owner = owner;
+                Volume = volume;
+            }
+
+            public IAudioEndpointVolume Volume { get; }
 
             public int OnNotify(IntPtr notifyData)
             {
-                owner.RaiseMuteStateChanged();
+                try
+                {
+                    int muted = notifyData == IntPtr.Zero ? -2 : (Marshal.ReadInt32(notifyData, MutedOffset) != 0 ? 1 : 0);
+                    if (System.Threading.Interlocked.Exchange(ref lastMuted, muted) != muted || muted == -2)
+                        owner.RaiseMuteStateChanged();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("Handling a volume notification failed", ex);
+                    owner.RaiseMuteStateChanged();
+                }
                 return CoreAudioInterop.S_OK;
             }
         }

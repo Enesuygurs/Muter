@@ -374,16 +374,6 @@ namespace Muter.UI
             MiniSizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(s => s.ToString()).ToArray() };
             MiniSizeSegments.SelectionChanged += (s, e) => Apply(() => app.SetMiniIndicatorSize(Sizes[MiniSizeSegments.SelectedIndex]));
             AddRow(page, "Size", null, MiniSizeSegments, ref y);
-
-            var legend = new Label
-            {
-                Text = "Green: microphone on    Red: muted    Gray: no microphone\nAmber: unknown (treat as on)",
-                Location = new Point(2, y + 4),
-                Size = new Size(page.Width - 14, 40),
-                ForeColor = Theme.TextSecondary,
-                Font = new Font(Theme.SemiboldFontFamily, 8.75F),
-            };
-            page.Controls.Add(legend);
         }
 
         #endregion

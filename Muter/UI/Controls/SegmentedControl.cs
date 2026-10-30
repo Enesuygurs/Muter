@@ -15,8 +15,7 @@ namespace Muter.UI.Controls
         private const int AnimationMs = 160;
         private static readonly Color Track = Color.FromArgb(32, 32, 34);
         private static readonly Color TrackBorder = Color.FromArgb(56, 56, 60);
-        private static readonly Color Thumb = Color.FromArgb(78, 78, 84);
-        private static readonly Color ThumbHighlight = Color.FromArgb(96, 96, 102);
+        private static readonly Color ThumbHighlight = Color.FromArgb(72, 200, 56); // top of the green thumb, Theme.Accent below
         private static readonly Color Divider = Color.FromArgb(62, 62, 66);
 
         private readonly Timer animation = new Timer { Interval = 15 };
@@ -194,7 +193,9 @@ namespace Muter.UI.Controls
                         g.FillPath(brush, shadow);
                 }
                 using (GraphicsPath path = Theme.RoundedRectangle(thumb, radius - pad))
-                using (var fill = new LinearGradientBrush(thumb, ThumbHighlight, Thumb, LinearGradientMode.Vertical))
+                using (var fill = Enabled
+                    ? (Brush)new LinearGradientBrush(thumb, ThumbHighlight, Theme.Accent, LinearGradientMode.Vertical)
+                    : new SolidBrush(Theme.ButtonFill))
                 {
                     g.FillPath(fill, path);
                 }
@@ -204,12 +205,11 @@ namespace Muter.UI.Controls
             {
                 var cell = new RectangleF(track.Left + pad + i * width, track.Top, width, track.Height);
                 bool selected = i == selectedIndex;
-                Color text = !Enabled ? Theme.TextDisabled : selected || i == hoverIndex ? Theme.TextPrimary : Theme.TextSecondary;
-                using (var font = new Font(Font, selected ? FontStyle.Bold : FontStyle.Regular))
-                {
-                    TextRenderer.DrawText(g, segments[i], selected ? font : Font, Rectangle.Round(cell), text,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-                }
+                // The text is only on the green thumb once it has (nearly) arrived there.
+                bool onThumb = selected && Math.Abs(thumbPosition - i) < 0.5f;
+                Color text = !Enabled ? Theme.TextDisabled : onThumb ? Theme.AccentText : selected || i == hoverIndex ? Theme.TextPrimary : Theme.TextSecondary;
+                TextRenderer.DrawText(g, segments[i], Font, Rectangle.Round(cell), text,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
             }
         }
     }

@@ -15,6 +15,13 @@ namespace Muter.UI.Controls
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             e.TextColor = e.Item.Enabled ? Theme.TextPrimary : Theme.TextDisabled;
+            if (e.Item.IsOnDropDown)
+            {
+                // Vertically centred in the whole row, whatever padding the row has.
+                Rectangle text = e.TextRectangle;
+                e.TextRectangle = new Rectangle(text.X, 0, text.Width, e.Item.Height);
+                e.TextFormat = (e.TextFormat & ~(TextFormatFlags.Top | TextFormatFlags.Bottom)) | TextFormatFlags.VerticalCenter;
+            }
             base.OnRenderItemText(e);
         }
 
@@ -28,7 +35,8 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle box = e.ImageRectangle;
+            Rectangle image = e.ImageRectangle;
+            var box = new Rectangle(image.X, (e.Item.Height - image.Height) / 2, image.Width, image.Height); // centred like the text
             float s = box.Height / 16f;
             using (var pen = new Pen(Theme.Accent, 2f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {

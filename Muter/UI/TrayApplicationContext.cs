@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -10,6 +9,7 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using Muter.Audio;
 using Muter.Hotkeys;
+using Muter.Localization;
 using Muter.Overlay;
 using Muter.Properties;
 using Muter.UI.Controls;
@@ -74,6 +74,7 @@ namespace Muter.UI
             this.playSound = playSound ?? FeedbackSounds.Play;
             realSounds = playSound == null;
             soundEnabled = settings.soundFeedback;
+            Strings.Current = Languages.Resolve(settings.language);
             this.hotkey = hotkey ?? throw new ArgumentNullException(nameof(hotkey));
             this.startup = startup ?? throw new ArgumentNullException(nameof(startup));
             if (providerFactory == null)
@@ -225,9 +226,9 @@ namespace Muter.UI
             DisposeItems(menu.Items);
 
             menu.Items.Add(BuildDevicesMenu());
-            menu.Items.Add(Item("Settings...", false, () => OpenSettings()));
+            menu.Items.Add(Item(Strings.Current.MenuSettings, false, () => OpenSettings()));
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(Item("Exit", false, ExitThread));
+            menu.Items.Add(Item(Strings.Current.MenuExit, false, ExitThread));
         }
 
         protected override void ExitThreadCore()
@@ -466,10 +467,11 @@ namespace Muter.UI
 
         internal IReadOnlyList<DeviceChoice> GetDeviceChoices(out bool listFailed)
         {
+            Strings text = Strings.Current;
             var choices = new List<DeviceChoice>
             {
-                new DeviceChoice(null, "Default (System)", "Default (System)", true),
-                new DeviceChoice(MicrophoneController.AllDevicesId, "All Devices", "All Devices", true),
+                new DeviceChoice(null, text.DeviceDefault, text.DeviceDefault, true),
+                new DeviceChoice(MicrophoneController.AllDevicesId, text.DeviceAll, text.DeviceAll, true),
             };
             string selectedId = SelectedDeviceId;
             bool selectedFound = selectedId == null || IsAllDevicesMode;
@@ -490,15 +492,15 @@ namespace Muter.UI
 
             if (!selectedFound)
             {
-                string name = string.IsNullOrEmpty(settings.selectedDeviceName) ? "Device" : settings.selectedDeviceName;
-                choices.Add(new DeviceChoice(selectedId, name, name + " (Disconnected)", false));
+                string name = string.IsNullOrEmpty(settings.selectedDeviceName) ? text.DeviceFallback : settings.selectedDeviceName;
+                choices.Add(new DeviceChoice(selectedId, name, string.Format(text.DeviceDisconnected, name), false));
             }
             return choices;
         }
 
         private ToolStripMenuItem BuildDevicesMenu()
         {
-            var devicesMenu = Submenu("Devices");
+            var devicesMenu = Submenu(Strings.Current.MenuDevices);
             string selectedId = SelectedDeviceId;
             IReadOnlyList<DeviceChoice> choices = GetDeviceChoices(out bool listFailed);
 
@@ -507,16 +509,16 @@ namespace Muter.UI
                 DeviceChoice choice = choices[i];
                 bool isSelected = string.Equals(choice.Id, selectedId, StringComparison.OrdinalIgnoreCase);
                 ToolStripMenuItem item = Item(choice.Label, isSelected, () => SelectDevice(choice.Id, choice.Name),
-                    choice.Id == null ? "The default recording device and the default communications device." : null);
+                    choice.Id == null ? Strings.Current.DeviceDefaultTip : null);
                 item.Enabled = choice.Available;
                 devicesMenu.DropDownItems.Add(item);
                 if (i == 1)
                     devicesMenu.DropDownItems.Add(new ToolStripSeparator());
             }
             if (listFailed)
-                devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(Failed to list devices)") { Enabled = false });
+                devicesMenu.DropDownItems.Add(new ToolStripMenuItem(Strings.Current.DevicesListFailed) { Enabled = false });
             else if (choices.Count(c => c.Id != null && c.Id != MicrophoneController.AllDevicesId && c.Available) == 0)
-                devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(No active devices found)") { Enabled = false });
+                devicesMenu.DropDownItems.Add(new ToolStripMenuItem(Strings.Current.DevicesNoneActive) { Enabled = false });
             return devicesMenu;
         }
 
@@ -545,21 +547,37 @@ namespace Muter.UI
 
         internal static string AnchorLabel(OverlayAnchor anchor)
         {
+            Strings text = Strings.Current;
             switch (anchor)
             {
-                case OverlayAnchor.LowerCenter: return "Lower center (default)";
-                case OverlayAnchor.Custom: return "Custom (dragged)";
-                default:
-                    string spaced = Regex.Replace(anchor.ToString(), "(?<=[a-z])(?=[A-Z])", " ");
-                    return spaced.Substring(0, 1) + spaced.Substring(1).ToLowerInvariant();
+                case OverlayAnchor.TopLeft: return text.AnchorTopLeft;
+                case OverlayAnchor.TopCenter: return text.AnchorTopCenter;
+                case OverlayAnchor.TopRight: return text.AnchorTopRight;
+                case OverlayAnchor.Center: return text.AnchorCenter;
+                case OverlayAnchor.LowerCenter: return text.AnchorLowerCenter;
+                case OverlayAnchor.BottomLeft: return text.AnchorBottomLeft;
+                case OverlayAnchor.BottomCenter: return text.AnchorBottomCenter;
+                case OverlayAnchor.BottomRight: return text.AnchorBottomRight;
+                default: return text.AnchorCustom;
+            }
+        }
+
+        internal static string SizeLabel(OverlaySize size)
+        {
+            switch (size)
+            {
+                case OverlaySize.Small: return Strings.Current.SizeSmall;
+                case OverlaySize.Large: return Strings.Current.SizeLarge;
+                default: return Strings.Current.SizeMedium;
             }
         }
 
         internal static string DisplayTimeLabel(int ms)
         {
+            Strings text = Strings.Current;
             if (ms == StatusOverlayForm.AlwaysVisible)
-                return "Always visible";
-            return ms == 1000 ? "1 second" : (ms / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " seconds";
+                return text.AlwaysVisible;
+            return ms == 1000 ? text.OneSecond : string.Format(text.Seconds, (ms / 1000.0).ToString("0.#", text.Culture));
         }
 
         // Monitor choices: value (setting) and label.
@@ -567,12 +585,12 @@ namespace Muter.UI
         {
             var choices = new List<KeyValuePair<string, string>>
             {
-                new KeyValuePair<string, string>(OverlayPlacement.PrimaryMonitor, "Primary monitor"),
-                new KeyValuePair<string, string>(OverlayPlacement.FollowMouseMonitor, "Monitor under the mouse"),
+                new KeyValuePair<string, string>(OverlayPlacement.PrimaryMonitor, Strings.Current.MonitorPrimary),
+                new KeyValuePair<string, string>(OverlayPlacement.FollowMouseMonitor, Strings.Current.MonitorUnderMouse),
             };
             foreach (ScreenInfo screen in ScreenInfo.All())
             {
-                string label = $"{DisplayLabel(screen.DeviceName)} ({screen.Bounds.Width}x{screen.Bounds.Height}{(screen.IsPrimary ? ", primary" : string.Empty)})";
+                string label = $"{DisplayLabel(screen.DeviceName)} ({screen.Bounds.Width}x{screen.Bounds.Height})";
                 choices.Add(new KeyValuePair<string, string>(screen.DeviceName, label));
             }
             return choices;
@@ -725,7 +743,7 @@ namespace Muter.UI
         private static string DisplayLabel(string deviceName)
         {
             Match number = Regex.Match(deviceName ?? string.Empty, @"(\d+)$");
-            return number.Success ? "Display " + number.Groups[1].Value : deviceName;
+            return number.Success ? string.Format(Strings.Current.DisplayNumber, number.Groups[1].Value) : deviceName;
         }
 
         #endregion
@@ -758,6 +776,35 @@ namespace Muter.UI
 
         internal SettingsForm SettingsWindow => settingsForm != null && !settingsForm.IsDisposed ? settingsForm : null;
 
+        // Languages.System follows the Windows display language.
+        internal void SetLanguage(string code)
+        {
+            settings.language = code ?? Languages.System;
+            SaveSettings();
+            Strings.Current = Languages.Resolve(settings.language);
+            Log.Info($"Language: {Strings.Current.NativeName}");
+            RebuildMenu();
+            UpdateUi(forceOverlay: false);
+
+            // The settings window is built in one language: open it again in the new one, on the same page and spot.
+            SettingsForm open = SettingsWindow;
+            if (open == null)
+                return;
+            Post(() =>
+            {
+                if (open.IsDisposed)
+                    return;
+                string page = open.CurrentPage;
+                Point location = open.Location;
+                open.Close();
+                SettingsForm reopened = OpenSettings();
+                if (reopened == null)
+                    return;
+                reopened.Location = location;
+                reopened.ShowPage(page);
+            });
+        }
+
         private void RaiseSettingsChanged()
         {
             try
@@ -786,7 +833,7 @@ namespace Muter.UI
             if (hotkey.IsRegistered && hotkey.Current.Equals(configuredHotkey))
                 return;
             if (!hotkey.TrySet(configuredHotkey, out string error) && notifyOnFailure)
-                ShowBalloon("Hotkey is not active", error + " Open Settings from the tray icon to pick another.", ToolTipIcon.Warning);
+                ShowBalloon(Strings.Current.HotkeyNotActiveTitle, string.Format(Strings.Current.HotkeyNotActiveText, error), ToolTipIcon.Warning);
         }
 
         internal void OpenHotkeyDialog(IWin32Window owner = null)
@@ -847,7 +894,7 @@ namespace Muter.UI
             catch (Exception ex)
             {
                 Log.Error("Could not change the startup setting", ex);
-                MessageBox.Show("Could not change the startup setting:\n" + ex.Message, "Muter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(string.Format(Strings.Current.StartupChangeFailed, ex.Message), "Muter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             RaiseSettingsChanged();
         }

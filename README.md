@@ -10,6 +10,7 @@ Muter is a simple yet powerful Windows utility that provides a clean, unobtrusiv
 -   **Overlay Settings:** Choose the position (corners, center, or drag it anywhere), the size, how long it stays on screen (or keep it always visible), and the monitor (primary, a specific one, or the one under the mouse).
 -   **Mini Indicator:** An optional small, always-visible status square (green = ON, red = OFF) that never gets in the way of your clicks.
 -   **Global Hotkey:** Mute or unmute your microphone from any application with a customizable key combination. The default is `Ctrl + Shift + F9` (users of version 1.0 keep their hotkey).
+-   **14 Languages:** English, Türkçe, Deutsch, Français, Español, Italiano, Português (Brasil), Русский, Polski, Nederlands, Українська, 日本語, 简体中文 and 한국어. By default Muter follows the Windows display language.
 -   **Push to Talk:** Optionally hold the hotkey to talk; the microphone is muted again as soon as you let go.
 -   **Sound Feedback:** An optional short sound tells you the result: a rising tone when the microphone is on, a falling one when it is verified muted, and a low warning when the state could not be verified.
 -   **Device Selection:** Control the default devices, one specific microphone, or all microphones at once, with optional syncing so they always share the same state.
@@ -33,7 +34,7 @@ Right-click the tray icon to switch between microphones (**Devices**) or to open
 
 | Page | Settings |
 |---|---|
-| **General** | **Microphones**: **Default (System)** controls the default recording device *and* the default communications device (call apps often use the latter); **All Devices** controls every microphone; or pick a single one. **Keep in sync** keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). **Start with Windows**. **Screen**: the monitor for the overlay and the mini indicator, and **Positions** (Move lets you drag both windows anywhere, Reset puts them back; a dragged window stays on the monitor it was dropped on). |
+| **General** | **Microphones**: **Default (System)** controls the default recording device *and* the default communications device (call apps often use the latter); **All Devices** controls every microphone; or pick a single one. **Keep in sync** keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). **Start with Windows**. **Screen**: the monitor for the overlay and the mini indicator, and **Positions** (Move lets you drag both windows anywhere, Reset puts them back; a dragged window stays on the monitor it was dropped on). **Language**: the Windows language or one of the 14 languages; the change applies immediately. |
 | **Hotkey** | **Mute hotkey**: press a new key combination and choose Save. Combinations that would block typing in other apps (such as `Shift + F`) are not accepted, and if another application already uses a combination, Muter tells you and keeps the old one. **Push to talk**: hold the hotkey to talk; when you let go (or when the key can no longer be seen, e.g. on a locked screen) the microphones are muted again. Turning it on mutes the microphones. **Sound feedback** on or off. |
 | **Overlay** | Show overlay, position, size and display time. |
 | **Mini indicator** | Show it, position and size. |

@@ -47,7 +47,7 @@ namespace Muter.UI
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Theme.Background;
             ForeColor = Theme.TextPrimary;
-            Font = new Font(Theme.FontFamily, 9.75F);
+            Font = new Font(Theme.SemiboldFontFamily, 9.75F);
             FormBorderStyle = FormBorderStyle.None;
             ClientSize = new Size(720, WindowHeight);
             StartPosition = FormStartPosition.CenterScreen;
@@ -223,7 +223,7 @@ namespace Muter.UI
                 AutoSize = true,
                 Location = new Point(24, WindowHeight - 32),
                 ForeColor = Theme.TextDisabled,
-                Font = new Font(Theme.FontFamily, 8.25F),
+                Font = new Font(Theme.SemiboldFontFamily, 8.25F),
             };
             Controls.Add(version);
         }
@@ -374,16 +374,6 @@ namespace Muter.UI
             MiniSizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(s => s.ToString()).ToArray() };
             MiniSizeSegments.SelectionChanged += (s, e) => Apply(() => app.SetMiniIndicatorSize(Sizes[MiniSizeSegments.SelectedIndex]));
             AddRow(page, "Size", null, MiniSizeSegments, ref y);
-
-            var legend = new Label
-            {
-                Text = "Green: microphone on    Red: muted    Gray: no microphone    Amber: unknown (treat as on)",
-                Location = new Point(2, y + 4),
-                Size = new Size(page.Width - 14, 40),
-                ForeColor = Theme.TextSecondary,
-                Font = new Font(Theme.FontFamily, 8.75F),
-            };
-            page.Controls.Add(legend);
         }
 
         #endregion

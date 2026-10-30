@@ -456,7 +456,7 @@ namespace Muter.Tests
                 // Choosing Custom unlocks the overlays for dragging.
                 form.PositionDropdown.Choose(OverlayAnchor.Custom);
                 Assert.True(app.PositionsUnlocked);
-                Assert.True(form.UnlockToggle.Checked);
+                Assert.Equal("Done", form.MovePositionsButton.Text);
             });
         }
 
@@ -482,14 +482,16 @@ namespace Muter.Tests
                 form.MiniSizeSegments.Choose(2);
                 Assert.True(app.MiniIndicator.Width > medium.Width);
 
-                form.UnlockToggle.Toggle();
+                form.ShowPage("General"); // Monitor and Positions are shared by both windows
+                Assert.Equal("Move", form.MovePositionsButton.Text);
+                form.MovePositionsButton.PerformClick();
+                Assert.Equal("Done", form.MovePositionsButton.Text);
                 Assert.True(app.PositionsUnlocked);
                 Assert.True(app.OverlayWindow.MoveMode && app.MiniIndicator.MoveMode);
                 Assert.True(app.OverlayWindow.Visible);
                 Assert.False(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 1500)); // stays while unlocked
 
                 settings.overlayPosition = "Custom";
-                form.ShowPage("Overlay"); // the button is on the Overlay page
                 form.ResetPositionsButton.PerformClick();
                 Assert.Equal("LowerCenter", settings.overlayPosition);
                 Assert.Equal("BottomRight", settings.miniIndicatorPosition);
@@ -500,6 +502,69 @@ namespace Muter.Tests
                 Application.DoEvents();
                 Assert.False(app.PositionsUnlocked);
                 Assert.False(app.OverlayWindow.MoveMode || app.MiniIndicator.MoveMode);
+            });
+        }
+
+        [Fact]
+        public void Positions_row_moves_both_windows_and_is_unavailable_when_nothing_is_shown()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            Settings settings = NewSettings(s => s.miniIndicatorEnabled = true);
+            WithApp(provider, settings, (app, hotkey) =>
+            {
+                SettingsForm form = OpenSettings(app);
+                Assert.Equal("General", form.CurrentPage);
+
+                form.MovePositionsButton.PerformClick();
+                Assert.True(app.PositionsUnlocked);
+                Assert.True(app.OverlayWindow.MoveMode && app.MiniIndicator.MoveMode);
+                Assert.Equal("Done", form.MovePositionsButton.Text);
+                Assert.Equal(FlatButtonStyle.Primary, form.MovePositionsButton.ButtonStyle);
+
+                form.MovePositionsButton.PerformClick(); // Done
+                Assert.False(app.PositionsUnlocked);
+                Assert.Equal("Move", form.MovePositionsButton.Text);
+
+                app.SetShowOverlay(false);
+                app.SetMiniIndicatorEnabled(false);
+                Assert.False(form.MovePositionsButton.Enabled);
+                form.MovePositionsButton.PerformClick();
+                Assert.False(app.PositionsUnlocked);
+
+                form.ShowPage("Overlay");
+                form.ShowOverlayToggle.Toggle();
+                Assert.True(form.MovePositionsButton.Enabled);
+            });
+        }
+
+        [Fact]
+        public void Switch_raises_its_event_only_for_the_user_and_finishes_its_animation()
+        {
+            TestSetup.RunSta(() =>
+            {
+                using (var host = new Form())
+                {
+                    var toggle = new ToggleSwitch();
+                    host.Controls.Add(toggle);
+                    host.Show();
+                    int raised = 0;
+                    toggle.Toggled += (s, e) => raised++;
+
+                    toggle.Checked = true; // from code: no event
+                    Assert.Equal(0, raised);
+
+                    toggle.Toggle(); // user: one event
+                    Assert.False(toggle.Checked);
+                    Assert.Equal(1, raised);
+                    TestSetup.PumpUntil(() => false, 300); // the animation completes and stops
+                    using (var bitmap = new Bitmap(toggle.Width, toggle.Height))
+                        toggle.DrawToBitmap(bitmap, new Rectangle(Point.Empty, toggle.Size));
+
+                    toggle.Enabled = false;
+                    toggle.Toggle();
+                    Assert.False(toggle.Checked);
+                    Assert.Equal(1, raised);
+                }
             });
         }
 

@@ -9,7 +9,7 @@ Muter is a simple yet powerful Windows utility that provides a clean, unobtrusiv
 -   **Visual Overlay:** A minimalist overlay instantly shows whether your microphone is **ON**, **OFF**, or **disconnected**.
 -   **Overlay Settings:** Choose the position (corners, center, or drag it anywhere), the size, how long it stays on screen (or keep it always visible), and the monitor (primary, a specific one, or the one under the mouse).
 -   **Mini Indicator:** An optional small, always-visible status square (green = ON, red = OFF) that never gets in the way of your clicks.
--   **Global Hotkey:** Mute or unmute your microphone from any application with a customizable key combination. The default is `Shift + F`.
+-   **Global Hotkey:** Mute or unmute your microphone from any application with a customizable key combination. The default is `Ctrl + Shift + F9` (users of version 1.0 keep their hotkey).
 -   **Device Selection:** Control the default devices, one specific microphone, or all microphones at once, with optional syncing so they always share the same state.
 -   **System Tray Icon:** The app sits quietly in your system tray, reflecting the current mic status and providing quick access to settings.
 -   **Lightweight:** Designed to use minimal system resources, so it won't impact your performance.

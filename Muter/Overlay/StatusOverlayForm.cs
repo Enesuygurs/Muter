@@ -107,8 +107,8 @@ namespace Muter.Overlay
             Image image = presentation.ShowsMuted ? AppResources.ImageMuted
                 : presentation.Visual == StatusVisual.NoDevice ? AppResources.ImageNoDevice
                 : AppResources.ImageLive;
-            // Native image size at this scale, shrunk only if it does not fit (the no-device image is larger).
-            Rectangle imageArea = Rectangle.Inflate(imageBox, -Px(4 * RenderScale), -Px(4 * RenderScale));
+            // Native image size at this scale, shrunk only if it does not fit (the glyphs are a bit taller than the area).
+            Rectangle imageArea = Rectangle.Inflate(imageBox, -Px(6 * RenderScale), -Px(6 * RenderScale));
             var native = new Size(Px(image.Width * RenderScale), Px(image.Height * RenderScale));
             var box = new Rectangle(imageArea.Left + Math.Max(0, (imageArea.Width - native.Width) / 2), imageArea.Top + Math.Max(0, (imageArea.Height - native.Height) / 2),
                 Math.Min(native.Width, imageArea.Width), Math.Min(native.Height, imageArea.Height));

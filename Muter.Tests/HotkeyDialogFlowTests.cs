@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -289,16 +290,29 @@ namespace Muter.Tests
                 {
                     Assert.True(hotkey.IsRegistered);
 
-                    // Open the dialog from the menu, check the hotkey is released, then close the dialog window.
+                    // Open the dialog from the settings window, check the hotkey is released, then close the dialog window.
+                    Exception closerFailure = null;
                     var closer = new Thread(() =>
                     {
-                        AutomationElement dialog = WaitFor("Muter Hotkey");
-                        releasedWhileOpen = !hotkey.IsRegistered;
-                        ((WindowPattern)dialog.GetCurrentPattern(WindowPattern.Pattern)).Close();
+                        try
+                        {
+                            AutomationElement dialog = WaitFor("Muter Hotkey");
+                            releasedWhileOpen = !hotkey.IsRegistered;
+                            ((WindowPattern)dialog.GetCurrentPattern(WindowPattern.Pattern)).Close();
+                        }
+                        catch (Exception ex)
+                        {
+                            closerFailure = ex;
+                            // Never leave the modal dialog on screen.
+                            foreach (Form open in Application.OpenForms.Cast<Form>().Where(f => f is HotkeyForm).ToList())
+                                open.BeginInvoke(new Action(open.Close));
+                        }
                     });
                     closer.Start();
-                    TrayApplicationContextTestsAccess.Click(app, "Hotkey");
+                    SettingsForm settingsWindow = app.OpenSettings();
+                    settingsWindow.ChangeHotkeyButton.PerformClick(); // runs the dialog modally
                     closer.Join(10000);
+                    Assert.Null(closerFailure);
                     Assert.True(hotkey.IsRegistered, "restored after closing without a change");
                     Assert.Equal(new Hotkey(Keys.F9, HotkeyModifiers.None), hotkey.Current);
 
@@ -311,21 +325,10 @@ namespace Muter.Tests
                     Assert.Equal((int)Keys.F7, settings.hotkeyKey);
                     Assert.Equal((int)(HotkeyModifiers.Control | HotkeyModifiers.Shift), settings.hotkeyModifiers);
                     Assert.Equal(new Hotkey(Keys.F7, HotkeyModifiers.Control | HotkeyModifiers.Shift), hotkey.Current);
-                    Assert.Equal("Hotkey (Ctrl + Shift + F7)...", TrayItemText(app, "Hotkey"));
+                    Assert.Equal("Ctrl + Shift + F7", string.Join(" + ", settingsWindow.HotkeyKeys.Keycaps)); // the open settings window follows
                 }
             });
             Assert.True(releasedWhileOpen, "the hotkey must be released while a new one is being chosen");
-        }
-
-        private static string TrayItemText(TrayApplicationContext app, string prefix)
-        {
-            app.RebuildMenu();
-            foreach (ToolStripItem item in app.Menu.Items)
-            {
-                if (item.Text.StartsWith(prefix, StringComparison.Ordinal))
-                    return item.Text;
-            }
-            return null;
         }
 
         private static bool ProcessDialogKey(Form form, Keys keyData)
@@ -347,9 +350,16 @@ namespace Muter.Tests
                 new PropertyCondition(AutomationElement.NameProperty, windowName));
             for (int i = 0; i < 100; i++)
             {
+                // Owned windows (a dialog over the settings window) are children of their owner in UI Automation.
                 AutomationElement found = AutomationElement.RootElement.FindFirst(TreeScope.Children, condition);
                 if (found != null)
                     return found;
+                foreach (AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, pid)))
+                {
+                    found = window.FindFirst(TreeScope.Descendants, condition);
+                    if (found != null)
+                        return found;
+                }
                 Thread.Sleep(50);
             }
             throw new TimeoutException($"Window '{windowName}' did not appear");

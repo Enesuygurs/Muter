@@ -20,20 +20,20 @@ Muter is a simple yet powerful Windows utility that provides a clean, unobtrusiv
 No installation is required.
 
 1.  Go to the **[Releases](https://github.com/Enesuygurs/Muter/releases)** page.
-2.  Download the `Muter.zip` file from the latest release.
+2.  Download the zip file (for example `Muter.v1.1.zip`) from the latest release.
 3.  Run the application. An icon will appear in your system tray.
 4.  Press the hotkey or left-click the tray icon to mute or unmute.
-5.  Right-click the tray icon for the settings.
+5.  Right-click the tray icon and choose Settings to change the microphones, the hotkey and the overlay.
 
-### Tray menu
+### Tray menu and settings
 
-| Item | What it does |
+Right-click the tray icon to switch between microphones (**Devices**) or to open **Settings**. Changes in the settings window apply immediately.
+
+| Page | Settings |
 |---|---|
-| **Devices** | **Default (System)** controls the default recording device *and* the default communications device (call apps often use the latter). **All Devices** controls every microphone. Or pick a single microphone. |
-| **Sync Devices** | Keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). |
-| **Overlay** | Show Overlay, Position, Size, Display Time, Monitor, Mini Indicator (with its own position and size), **Unlock Positions** to drag the overlay and the mini indicator, and **Reset Positions**. The monitor choice applies to both windows; a dragged window stays on the monitor it was dropped on. |
-| **Run Startup** | Starts Muter with Windows. |
-| **Hotkey** | Press a new key combination and choose Save. Combinations that would block typing in other apps (such as `Shift + F`) are not accepted, and if another application already uses a combination, Muter tells you and keeps the old one. |
+| **General** | **Microphones**: **Default (System)** controls the default recording device *and* the default communications device (call apps often use the latter); **All Devices** controls every microphone; or pick a single one. **Keep in sync** keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). **Mute hotkey**: press a new key combination and choose Save. Combinations that would block typing in other apps (such as `Shift + F`) are not accepted, and if another application already uses a combination, Muter tells you and keeps the old one. **Screen**: the monitor for the overlay and the mini indicator, and **Positions** (Move lets you drag both windows anywhere, Reset puts them back; a dragged window stays on the monitor it was dropped on). **Start with Windows**. |
+| **Overlay** | Show overlay, position, size and display time. |
+| **Mini indicator** | Show it, position and size. |
 
 ### What the states mean
 

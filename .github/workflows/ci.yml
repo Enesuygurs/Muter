@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build Muter.sln -c Release -nologo
+
+      # The tests in Muter.Tests/Hardware need real microphones, which the build machine does not have.
+      - name: Test
+        run: dotnet test Muter.sln -c Release --no-build -nologo --filter "FullyQualifiedName!~Muter.Tests.Hardware" --logger "console;verbosity=normal"
+
+      - name: Upload the app
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Muter
+          path: |
+            Muter/bin/Release/Muter.exe
+            Muter/bin/Release/Muter.exe.config

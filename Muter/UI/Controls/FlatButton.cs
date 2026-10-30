@@ -27,7 +27,6 @@ namespace Muter.UI.Controls
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.SupportsTransparentBackColor, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);
-            Cursor = Cursors.Hand;
             BackColor = Theme.Background;
             ForeColor = Theme.TextPrimary;
         }
@@ -109,7 +108,6 @@ namespace Muter.UI.Controls
 
         protected override void OnEnabledChanged(EventArgs e)
         {
-            Cursor = Enabled ? Cursors.Hand : Cursors.Default;
             Invalidate();
             base.OnEnabledChanged(e);
         }
@@ -136,6 +134,7 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float scale = DeviceDpi / 96f;
             var bounds = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             Color text;

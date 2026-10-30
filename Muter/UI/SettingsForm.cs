@@ -6,15 +6,17 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Muter.Audio;
 using Muter.Hotkeys;
+using Muter.Localization;
 using Muter.Overlay;
 using Muter.Properties;
 using Muter.UI.Controls;
 
 namespace Muter.UI
 {
-    // All settings in one window: a side navigation with General, Overlay and Mini indicator pages. Every change is
-    // applied immediately through the TrayApplicationContext, and the window follows changes made elsewhere (e.g. an
-    // overlay dragged to a new position).
+    // All settings in one window: a side navigation with General, Hotkey, Overlay and Mini indicator pages. Every change
+    // is applied immediately through the TrayApplicationContext, and the window follows changes made elsewhere (e.g. an
+    // overlay dragged to a new position). It is built in the current language; changing the language opens it again.
+    // Pages are identified by fixed keys (PageGeneral etc.), whatever the language.
     public class SettingsForm : Form
     {
         private const int WM_NCHITTEST = 0x0084;
@@ -27,7 +29,13 @@ namespace Muter.UI
         private const int RowGap = 6;
         private const int WindowHeight = 580;
 
+        internal const string PageGeneral = "General";
+        internal const string PageHotkey = "Hotkey";
+        internal const string PageOverlay = "Overlay";
+        internal const string PageMiniIndicator = "Mini indicator";
+
         private static readonly OverlaySize[] Sizes = { OverlaySize.Small, OverlaySize.Medium, OverlaySize.Large };
+        private static Strings Lang => Strings.Current;
 
         private readonly TrayApplicationContext app;
         private readonly Settings settings;
@@ -51,7 +59,7 @@ namespace Muter.UI
             FormBorderStyle = FormBorderStyle.None;
             ClientSize = new Size(720, WindowHeight);
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "Muter Settings";
+            Text = Lang.SettingsWindowTitle;
             Icon = AppResources.AppIcon;
             KeyPreview = true;
 
@@ -65,7 +73,7 @@ namespace Muter.UI
             BuildMiniIndicatorPage();
             ResumeLayout(false);
 
-            ShowPage("General");
+            ShowPage(PageGeneral);
             RefreshDeviceOptions();
             RefreshFromSettings();
             app.SettingsChanged += OnSettingsChanged;
@@ -107,6 +115,8 @@ namespace Muter.UI
         internal DropdownButton MiniPositionDropdown { get; private set; }
 
         internal SegmentedControl MiniSizeSegments { get; private set; }
+
+        internal DropdownButton LanguageDropdown { get; private set; }
 
         internal string CurrentPage => pages.First(p => p.Value.Visible).Key;
 
@@ -188,7 +198,7 @@ namespace Muter.UI
             FormClosed += (s, e) => icon.Image?.Dispose();
             var title = new Label
             {
-                Text = "Settings",
+                Text = Lang.SettingsTitle,
                 AutoSize = true,
                 Location = new Point(42, 11),
                 Font = new Font("Segoe UI Semibold", 11F, FontStyle.Bold),
@@ -212,10 +222,16 @@ namespace Muter.UI
         private void BuildNavigation()
         {
             int y = TitleBarHeight + 4;
-            foreach (var entry in new[] { ("General", ""), ("Hotkey", ""), ("Overlay", ""), ("Mini indicator", "") })
+            foreach (var entry in new[]
+            {
+                (PageGeneral, Lang.PageGeneral, ""),
+                (PageHotkey, Lang.PageHotkey, ""),
+                (PageOverlay, Lang.PageOverlay, ""),
+                (PageMiniIndicator, Lang.PageMiniIndicator, ""),
+            })
             {
                 string page = entry.Item1;
-                var button = new NavButton { Text = page, Glyph = entry.Item2, Location = new Point(12, y), Size = new Size(172, 38) };
+                var button = new NavButton { Text = entry.Item2, Glyph = entry.Item3, Location = new Point(12, y), Size = new Size(172, 38) };
                 button.Click += (s, e) => ShowPage(page);
                 navButtons[page] = button;
                 Controls.Add(button);
@@ -240,18 +256,18 @@ namespace Muter.UI
             return version.Build > 0 ? version.ToString(3) : version.ToString(2);
         }
 
-        private Panel NewPage(string name, out int y)
+        private Panel NewPage(string key, string title, out int y)
         {
             var page = new Panel { Location = Point.Empty, Size = content.Size, BackColor = Theme.Background, Visible = false };
             page.Controls.Add(new Label
             {
-                Text = name,
+                Text = title,
                 AutoSize = true,
                 Location = new Point(0, 6),
                 Font = new Font("Segoe UI Semibold", 15F, FontStyle.Bold),
                 ForeColor = Theme.TextPrimary,
             });
-            pages[name] = page;
+            pages[key] = page;
             content.Controls.Add(page);
             y = 52;
             return page;
@@ -288,9 +304,9 @@ namespace Muter.UI
 
         private void BuildGeneralPage()
         {
-            Panel page = NewPage("General", out int y);
+            Panel page = NewPage(PageGeneral, Lang.PageGeneral, out int y);
 
-            AddSection(page, "Microphone", ref y);
+            AddSection(page, Lang.SectionMicrophone, ref y);
             DevicesDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             DevicesDropdown.DropDownOpening += (s, e) => RefreshDeviceOptions();
             DevicesDropdown.SelectionChanged += (s, e) =>
@@ -299,101 +315,118 @@ namespace Muter.UI
                 string name = DevicesDropdown.SelectedText;
                 Apply(() => app.SelectDevice(string.IsNullOrEmpty(id) ? null : id, name));
             };
-            AddRow(page, "Microphones", "Which microphones the hotkey mutes", DevicesDropdown, ref y);
+            AddRow(page, Lang.Microphones, Lang.MicrophonesHint, DevicesDropdown, ref y);
 
             SyncToggle = new ToggleSwitch();
             SyncToggle.Toggled += (s, e) => Apply(() => app.SetSyncDevices(SyncToggle.Checked));
-            AddRow(page, "Keep in sync", "Controlled microphones always share the same state", SyncToggle, ref y);
+            AddRow(page, Lang.KeepInSync, Lang.KeepInSyncHint, SyncToggle, ref y);
 
             y += 6;
-            AddSection(page, "Startup", ref y);
+            AddSection(page, Lang.SectionStartup, ref y);
             StartupToggle = new ToggleSwitch();
             StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
-            AddRow(page, "Start with Windows", "Run Muter when you sign in", StartupToggle, ref y);
+            AddRow(page, Lang.StartWithWindows, Lang.StartWithWindowsHint, StartupToggle, ref y);
 
             // Settings shared by the overlay and the mini indicator.
             y += 6;
-            AddSection(page, "Screen", ref y);
+            AddSection(page, Lang.SectionScreen, ref y);
             MonitorDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             MonitorDropdown.DropDownOpening += (s, e) => RefreshMonitorOptions();
             MonitorDropdown.SelectionChanged += (s, e) => Apply(() => app.SetMonitor((string)MonitorDropdown.SelectedValue));
-            AddRow(page, "Monitor", "For the overlay and mini indicator", MonitorDropdown, ref y);
+            AddRow(page, Lang.Monitor, Lang.MonitorHint, MonitorDropdown, ref y);
 
-            var positionsPanel = new Panel { Size = new Size(168, 32), BackColor = Theme.Surface };
-            MovePositionsButton = new FlatButton { Text = "Move", Location = new Point(0, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            // The buttons are at least 80 wide and grow for longer words; Move turns into Done, so it fits both.
+            var buttonFont = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            int moveWidth = ButtonWidth(buttonFont, Lang.PositionsMove, Lang.PositionsDone);
+            int resetWidth = ButtonWidth(buttonFont, Lang.PositionsReset);
+            var positionsPanel = new Panel { Size = new Size(moveWidth + 8 + resetWidth, 32), BackColor = Theme.Surface };
+            MovePositionsButton = new FlatButton { Text = Lang.PositionsMove, Location = new Point(0, 0), Size = new Size(moveWidth, 32), BackColor = Theme.Surface, Font = buttonFont };
             MovePositionsButton.Click += (s, e) => Apply(() => app.SetPositionsUnlocked(!app.PositionsUnlocked));
-            ResetPositionsButton = new FlatButton { Text = "Reset", Location = new Point(88, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ResetPositionsButton = new FlatButton { Text = Lang.PositionsReset, Location = new Point(moveWidth + 8, 0), Size = new Size(resetWidth, 32), BackColor = Theme.Surface, Font = buttonFont };
             ResetPositionsButton.Click += (s, e) => Apply(app.ResetPositions);
             positionsPanel.Controls.Add(MovePositionsButton);
             positionsPanel.Controls.Add(ResetPositionsButton);
-            positionsRow = AddRow(page, "Positions", string.Empty, positionsPanel, ref y);
+            positionsRow = AddRow(page, Lang.Positions, string.Empty, positionsPanel, ref y);
 
+            y += 6;
+            AddSection(page, Lang.SectionLanguage, ref y);
+            LanguageDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
+            LanguageDropdown.SetOptions(new[] { new DropdownOption(Lang.LanguageSystem, Languages.System) }
+                .Concat(Languages.All.Select(l => new DropdownOption(l.NativeName, l.Code))), null);
+            LanguageDropdown.SelectionChanged += (s, e) => Apply(() => app.SetLanguage((string)LanguageDropdown.SelectedValue));
+            AddRow(page, Lang.Language, Lang.LanguageHint, LanguageDropdown, ref y);
+        }
+
+        private static int ButtonWidth(Font font, params string[] texts)
+        {
+            int widest = texts.Max(t => TextRenderer.MeasureText(t, font).Width);
+            return Math.Max(80, widest + 28);
         }
 
         private void BuildHotkeyPage()
         {
-            Panel page = NewPage("Hotkey", out int y);
+            Panel page = NewPage(PageHotkey, Lang.PageHotkey, out int y);
 
-            AddSection(page, "Hotkey", ref y);
+            AddSection(page, Lang.SectionHotkey, ref y);
             var hotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
             HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Cursor = Cursors.Default, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
-            ChangeHotkeyButton = new FlatButton { Text = "Change", Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ChangeHotkeyButton = new FlatButton { Text = Lang.Change, Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
             ChangeHotkeyButton.Click += (s, e) => app.OpenHotkeyDialog(this);
             hotkeyPanel.Controls.Add(HotkeyKeys);
             hotkeyPanel.Controls.Add(ChangeHotkeyButton);
-            AddRow(page, "Mute hotkey", "Mutes and unmutes from any app", hotkeyPanel, ref y);
+            AddRow(page, Lang.MuteHotkey, Lang.MuteHotkeyHint, hotkeyPanel, ref y);
 
             PushToTalkToggle = new ToggleSwitch();
             PushToTalkToggle.Toggled += (s, e) => Apply(() => app.SetPushToTalk(PushToTalkToggle.Checked));
-            AddRow(page, "Push to talk", "Hold the hotkey to talk; muted again when you let go", PushToTalkToggle, ref y);
+            AddRow(page, Lang.PushToTalk, Lang.PushToTalkHint, PushToTalkToggle, ref y);
 
             y += 6;
-            AddSection(page, "Sound", ref y);
+            AddSection(page, Lang.SectionSound, ref y);
             SoundToggle = new ToggleSwitch();
             SoundToggle.Toggled += (s, e) => Apply(() => app.SetSoundFeedback(SoundToggle.Checked));
-            AddRow(page, "Sound feedback", "A short sound when the microphone is turned on or off", SoundToggle, ref y);
+            AddRow(page, Lang.SoundFeedback, Lang.SoundFeedbackHint, SoundToggle, ref y);
         }
 
         private void BuildOverlayPage()
         {
-            Panel page = NewPage("Overlay", out int y);
+            Panel page = NewPage(PageOverlay, Lang.PageOverlay, out int y);
 
             ShowOverlayToggle = new ToggleSwitch();
             ShowOverlayToggle.Toggled += (s, e) => Apply(() => app.SetShowOverlay(ShowOverlayToggle.Checked));
-            AddRow(page, "Show overlay", "Appears when the microphone is turned on or off", ShowOverlayToggle, ref y);
+            AddRow(page, Lang.ShowOverlay, Lang.ShowOverlayHint, ShowOverlayToggle, ref y);
 
             PositionDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             PositionDropdown.SetOptions(Enum.GetValues(typeof(OverlayAnchor)).Cast<OverlayAnchor>()
                 .Select(a => new DropdownOption(TrayApplicationContext.AnchorLabel(a), a)), null);
             PositionDropdown.SelectionChanged += (s, e) => Apply(() => app.SetOverlayAnchor((OverlayAnchor)PositionDropdown.SelectedValue));
-            AddRow(page, "Position", "Choose Custom to drag it anywhere", PositionDropdown, ref y);
+            AddRow(page, Lang.Position, Lang.PositionHint, PositionDropdown, ref y);
 
-            SizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(s => s.ToString()).ToArray() };
+            SizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(TrayApplicationContext.SizeLabel).ToArray() };
             SizeSegments.SelectionChanged += (s, e) => Apply(() => app.SetOverlaySize(Sizes[SizeSegments.SelectedIndex]));
-            AddRow(page, "Size", null, SizeSegments, ref y);
+            AddRow(page, Lang.Size, null, SizeSegments, ref y);
 
             DisplayTimeDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             DisplayTimeDropdown.SetOptions(TrayApplicationContext.DisplayTimeChoices.Select(ms => new DropdownOption(TrayApplicationContext.DisplayTimeLabel(ms), ms)), null);
             DisplayTimeDropdown.SelectionChanged += (s, e) => Apply(() => app.SetDisplayTime((int)DisplayTimeDropdown.SelectedValue));
-            AddRow(page, "Display time", "How long it stays before fading out", DisplayTimeDropdown, ref y);
+            AddRow(page, Lang.DisplayTime, Lang.DisplayTimeHint, DisplayTimeDropdown, ref y);
         }
 
         private void BuildMiniIndicatorPage()
         {
-            Panel page = NewPage("Mini indicator", out int y);
+            Panel page = NewPage(PageMiniIndicator, Lang.PageMiniIndicator, out int y);
 
             MiniIndicatorToggle = new ToggleSwitch();
             MiniIndicatorToggle.Toggled += (s, e) => Apply(() => app.SetMiniIndicatorEnabled(MiniIndicatorToggle.Checked));
-            AddRow(page, "Show mini indicator", "A small, always-visible status square", MiniIndicatorToggle, ref y);
+            AddRow(page, Lang.ShowMiniIndicator, Lang.ShowMiniIndicatorHint, MiniIndicatorToggle, ref y);
 
             MiniPositionDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             MiniPositionDropdown.SetOptions(TrayApplicationContext.MiniIndicatorAnchorChoices.Select(a => new DropdownOption(TrayApplicationContext.AnchorLabel(a), a)), null);
             MiniPositionDropdown.SelectionChanged += (s, e) => Apply(() => app.SetMiniIndicatorAnchor((OverlayAnchor)MiniPositionDropdown.SelectedValue));
-            AddRow(page, "Position", "Choose Custom to drag it anywhere", MiniPositionDropdown, ref y);
+            AddRow(page, Lang.Position, Lang.PositionHint, MiniPositionDropdown, ref y);
 
-            MiniSizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(s => s.ToString()).ToArray() };
+            MiniSizeSegments = new SegmentedControl { Size = new Size(230, 30), Font = Font, Segments = Sizes.Select(TrayApplicationContext.SizeLabel).ToArray() };
             MiniSizeSegments.SelectionChanged += (s, e) => Apply(() => app.SetMiniIndicatorSize(Sizes[MiniSizeSegments.SelectedIndex]));
-            AddRow(page, "Size", null, MiniSizeSegments, ref y);
+            AddRow(page, Lang.Size, null, MiniSizeSegments, ref y);
         }
 
         #endregion
@@ -449,6 +482,8 @@ namespace Muter.UI
                 MiniIndicatorToggle.Checked = settings.miniIndicatorEnabled;
                 MiniPositionDropdown.SelectedValue = OverlayPlacement.ParseEnum(settings.miniIndicatorPosition, OverlayAnchor.BottomRight);
                 MiniSizeSegments.SelectedIndex = Array.IndexOf(Sizes, OverlayPlacement.ParseEnum(settings.miniIndicatorSize, OverlaySize.Medium));
+
+                LanguageDropdown.SelectedValue = Languages.All.Any(l => l.Code == settings.language) ? settings.language : Languages.System;
             }
             finally
             {
@@ -461,7 +496,7 @@ namespace Muter.UI
             IReadOnlyList<TrayApplicationContext.DeviceChoice> choices = app.GetDeviceChoices(out bool listFailed);
             var options = choices.Select(c => new DropdownOption(c.Label, c.Id ?? string.Empty, c.Available)).ToList();
             if (listFailed)
-                options.Add(new DropdownOption("(Could not list the microphones)", "\0failed", enabled: false));
+                options.Add(new DropdownOption(Lang.DevicesListFailed, "\0failed", enabled: false));
             DevicesDropdown.SetOptions(options, app.SelectedDeviceId ?? string.Empty);
         }
 
@@ -470,12 +505,12 @@ namespace Muter.UI
         {
             bool unlocked = app.PositionsUnlocked;
             bool anythingShown = settings.showGui || settings.miniIndicatorEnabled;
-            MovePositionsButton.Text = unlocked ? "Done" : "Move";
+            MovePositionsButton.Text = unlocked ? Lang.PositionsDone : Lang.PositionsMove;
             MovePositionsButton.ButtonStyle = unlocked ? FlatButtonStyle.Primary : FlatButtonStyle.Secondary;
             MovePositionsButton.Enabled = unlocked || anythingShown;
-            positionsRow.Description = unlocked ? "Drag them now, then click Done"
-                : anythingShown ? "Drag the overlay and the mini indicator anywhere"
-                : "Turn on the overlay or the mini indicator first";
+            positionsRow.Description = unlocked ? Lang.PositionsHintMoving
+                : anythingShown ? Lang.PositionsHint
+                : Lang.PositionsHintNothingShown;
         }
 
         private void RefreshMonitorOptions()

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Windows.Forms;
 using Muter.Audio;
 using Muter.Hotkeys;
+using Muter.Localization;
 using Muter.Properties;
 using Muter.UI;
 
@@ -23,7 +24,8 @@ namespace Muter
             {
                 if (!isFirstInstance)
                 {
-                    MessageBox.Show("Muter is already running. Look for its icon in the system tray.", "Muter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Strings.Current = Languages.Resolve(Settings.Default.language);
+                    MessageBox.Show(Strings.Current.AlreadyRunning, "Muter", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 

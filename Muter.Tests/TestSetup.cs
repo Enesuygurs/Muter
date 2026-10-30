@@ -15,6 +15,8 @@ namespace Muter.Tests
         static TestSetup()
         {
             Log.Directory = Path.Combine(Path.GetTempPath(), "MuterTests-" + Guid.NewGuid().ToString("N"));
+            // The app follows the Windows display language by default; the tests check the English texts.
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
         }
 
         public static void Init()

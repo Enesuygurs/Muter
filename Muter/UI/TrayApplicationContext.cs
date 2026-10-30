@@ -12,6 +12,7 @@ using Muter.Audio;
 using Muter.Hotkeys;
 using Muter.Overlay;
 using Muter.Properties;
+using Muter.UI.Controls;
 using Timer = System.Windows.Forms.Timer;
 
 namespace Muter.UI
@@ -59,6 +60,7 @@ namespace Muter.UI
         private bool moveMode;
         private bool hotkeyDialogOpen;
         private bool shutDown;
+        private SettingsForm settingsForm;
 
         public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup)
         {
@@ -81,7 +83,7 @@ namespace Muter.UI
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
 
-            menu = new ContextMenuStrip { Font = menuFont };
+            menu = new ContextMenuStrip { Font = menuFont, Renderer = new DarkMenuRenderer() };
             menu.Opening += (s, e) =>
             {
                 RebuildMenu();
@@ -116,6 +118,11 @@ namespace Muter.UI
             audio.RequestRefresh();
             pollTimer.Start();
         }
+
+        // Raised whenever a setting changes (from the settings window, the menu or by dragging an overlay).
+        internal event EventHandler SettingsChanged;
+
+        internal Settings Settings => settings;
 
         // Latest state reported by the audio thread.
         internal MicrophoneStatus Status => status;
@@ -164,12 +171,7 @@ namespace Muter.UI
             DisposeItems(menu.Items);
 
             menu.Items.Add(BuildDevicesMenu());
-            menu.Items.Add(Item("Sync Devices", settings.syncDevices, ToggleSyncDevices,
-                "Keep every controlled microphone in the same mute state (All Devices and Default modes)."));
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(BuildOverlayMenu());
-            menu.Items.Add(Item("Run Startup", SafeIsStartupEnabled(), ToggleStartup));
-            menu.Items.Add(Item($"Hotkey ({HotkeyText.Format(configuredHotkey)})...", false, OpenHotkeyDialog));
+            menu.Items.Add(Item("Settings...", false, () => OpenSettings()));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Item("Exit", false, ExitThread));
         }
@@ -364,47 +366,85 @@ namespace Muter.UI
 
         #region Devices
 
-        private ToolStripMenuItem BuildDevicesMenu()
+        // One entry of the device choice (tray menu and settings window). Id null = default devices.
+        internal sealed class DeviceChoice
         {
-            var devicesMenu = Submenu("Devices");
-            string selectedId = settings.selectedDeviceId;
-            bool isDefault = string.IsNullOrWhiteSpace(selectedId);
+            public DeviceChoice(string id, string name, string label, bool available)
+            {
+                Id = id;
+                Name = name;
+                Label = label;
+                Available = available;
+            }
 
-            devicesMenu.DropDownItems.Add(Item("Default (System)", isDefault, () => SelectDevice(null, "Default (System)"),
-                "The default recording device and the default communications device."));
-            devicesMenu.DropDownItems.Add(Item("All Devices", IsAllDevicesMode, () => SelectDevice(MicrophoneController.AllDevicesId, "All Devices")));
-            devicesMenu.DropDownItems.Add(new ToolStripSeparator());
+            public string Id { get; }
 
-            bool selectedFound = isDefault || IsAllDevicesMode;
+            public string Name { get; }
+
+            public string Label { get; }
+
+            public bool Available { get; }
+        }
+
+        internal string SelectedDeviceId => string.IsNullOrWhiteSpace(settings.selectedDeviceId) ? null : settings.selectedDeviceId;
+
+        internal IReadOnlyList<DeviceChoice> GetDeviceChoices(out bool listFailed)
+        {
+            var choices = new List<DeviceChoice>
+            {
+                new DeviceChoice(null, "Default (System)", "Default (System)", true),
+                new DeviceChoice(MicrophoneController.AllDevicesId, "All Devices", "All Devices", true),
+            };
+            string selectedId = SelectedDeviceId;
+            bool selectedFound = selectedId == null || IsAllDevicesMode;
+            listFailed = false;
             try
             {
-                IReadOnlyList<AudioEndpointInfo> devices = audio.GetDevices(timeoutMs: 1000);
-                foreach (AudioEndpointInfo device in devices)
+                foreach (AudioEndpointInfo device in audio.GetDevices(timeoutMs: 1000))
                 {
-                    bool isSelected = string.Equals(device.Id, selectedId, StringComparison.OrdinalIgnoreCase);
-                    selectedFound |= isSelected;
-                    string id = device.Id;
-                    string name = device.Name;
-                    devicesMenu.DropDownItems.Add(Item(name, isSelected, () => SelectDevice(id, name)));
+                    choices.Add(new DeviceChoice(device.Id, device.Name, device.Name, true));
+                    selectedFound |= string.Equals(device.Id, selectedId, StringComparison.OrdinalIgnoreCase);
                 }
-                if (devices.Count == 0)
-                    devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(No active devices found)") { Enabled = false });
             }
             catch (Exception ex)
             {
-                Log.Warn("Could not list the microphones for the menu", ex);
-                devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(Failed to list devices)") { Enabled = false });
+                Log.Warn("Could not list the microphones", ex);
+                listFailed = true;
             }
 
             if (!selectedFound)
             {
-                string label = string.IsNullOrEmpty(settings.selectedDeviceName) ? "Device" : settings.selectedDeviceName;
-                devicesMenu.DropDownItems.Add(new ToolStripMenuItem($"{label} (Disconnected)") { Checked = true, Enabled = false });
+                string name = string.IsNullOrEmpty(settings.selectedDeviceName) ? "Device" : settings.selectedDeviceName;
+                choices.Add(new DeviceChoice(selectedId, name, name + " (Disconnected)", false));
             }
+            return choices;
+        }
+
+        private ToolStripMenuItem BuildDevicesMenu()
+        {
+            var devicesMenu = Submenu("Devices");
+            string selectedId = SelectedDeviceId;
+            IReadOnlyList<DeviceChoice> choices = GetDeviceChoices(out bool listFailed);
+
+            for (int i = 0; i < choices.Count; i++)
+            {
+                DeviceChoice choice = choices[i];
+                bool isSelected = string.Equals(choice.Id, selectedId, StringComparison.OrdinalIgnoreCase);
+                ToolStripMenuItem item = Item(choice.Label, isSelected, () => SelectDevice(choice.Id, choice.Name),
+                    choice.Id == null ? "The default recording device and the default communications device." : null);
+                item.Enabled = choice.Available;
+                devicesMenu.DropDownItems.Add(item);
+                if (i == 1)
+                    devicesMenu.DropDownItems.Add(new ToolStripSeparator());
+            }
+            if (listFailed)
+                devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(Failed to list devices)") { Enabled = false });
+            else if (choices.Count(c => c.Id != null && c.Id != MicrophoneController.AllDevicesId && c.Available) == 0)
+                devicesMenu.DropDownItems.Add(new ToolStripMenuItem("(No active devices found)") { Enabled = false });
             return devicesMenu;
         }
 
-        private void SelectDevice(string deviceId, string deviceName)
+        internal void SelectDevice(string deviceId, string deviceName)
         {
             settings.selectedDeviceId = deviceId ?? string.Empty;
             settings.selectedDeviceName = deviceName ?? string.Empty;
@@ -412,159 +452,138 @@ namespace Muter.UI
             audio.SetTarget(deviceId);
         }
 
-        private void ToggleSyncDevices()
+        internal void SetSyncDevices(bool enabled)
         {
-            settings.syncDevices = !settings.syncDevices;
+            settings.syncDevices = enabled;
             SaveSettings();
-            audio.SetSync(settings.syncDevices);
+            audio.SetSync(enabled);
         }
 
         #endregion
 
-
         #region Overlay settings
 
-        private ToolStripMenuItem BuildOverlayMenu()
+        internal static IReadOnlyList<int> DisplayTimeChoices => DisplayTimeChoicesMs;
+
+        internal static IReadOnlyList<OverlayAnchor> MiniIndicatorAnchorChoices => MiniIndicatorAnchors;
+
+        internal static string AnchorLabel(OverlayAnchor anchor)
         {
-            var overlayMenu = Submenu("Overlay");
-            OverlayAnchor overlayAnchor = OverlayPlacement.ParseEnum(settings.overlayPosition, OverlayAnchor.LowerCenter);
-            OverlaySize overlaySize = OverlayPlacement.ParseEnum(settings.overlaySize, OverlaySize.Medium);
-
-            overlayMenu.DropDownItems.Add(Item("Show Overlay", settings.showGui, () =>
+            switch (anchor)
             {
-                settings.showGui = !settings.showGui;
-                SaveAndApplyOverlaySettings();
-            }));
-
-            var position = Submenu("Position");
-            foreach (OverlayAnchor anchor in Enum.GetValues(typeof(OverlayAnchor)))
-            {
-                OverlayAnchor value = anchor;
-                position.DropDownItems.Add(Item(AnchorLabel(anchor), overlayAnchor == anchor, () => SetOverlayAnchor(value)));
+                case OverlayAnchor.LowerCenter: return "Lower center (default)";
+                case OverlayAnchor.Custom: return "Custom (dragged)";
+                default:
+                    string spaced = Regex.Replace(anchor.ToString(), "(?<=[a-z])(?=[A-Z])", " ");
+                    return spaced.Substring(0, 1) + spaced.Substring(1).ToLowerInvariant();
             }
-            overlayMenu.DropDownItems.Add(position);
-
-            var size = Submenu("Size");
-            foreach (OverlaySize option in Enum.GetValues(typeof(OverlaySize)))
-            {
-                OverlaySize value = option;
-                size.DropDownItems.Add(Item(option.ToString(), overlaySize == option, () =>
-                {
-                    settings.overlaySize = value.ToString();
-                    SaveAndApplyOverlaySettings();
-                }));
-            }
-            overlayMenu.DropDownItems.Add(size);
-
-            var displayTime = Submenu("Display Time");
-            foreach (int ms in DisplayTimeChoicesMs)
-            {
-                int value = ms;
-                string label = ms == StatusOverlayForm.AlwaysVisible ? "Always Visible" : (ms / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " s";
-                displayTime.DropDownItems.Add(Item(label, settings.overlayDurationMs == ms, () =>
-                {
-                    settings.overlayDurationMs = value;
-                    SaveAndApplyOverlaySettings();
-                }));
-            }
-            overlayMenu.DropDownItems.Add(displayTime);
-
-            overlayMenu.DropDownItems.Add(BuildMonitorMenu());
-            overlayMenu.DropDownItems.Add(new ToolStripSeparator());
-
-            overlayMenu.DropDownItems.Add(Item("Mini Indicator", settings.miniIndicatorEnabled, () =>
-            {
-                settings.miniIndicatorEnabled = !settings.miniIndicatorEnabled;
-                SaveAndApplyOverlaySettings();
-            }, "A small always-visible status square."));
-
-            OverlayAnchor miniAnchor = OverlayPlacement.ParseEnum(settings.miniIndicatorPosition, OverlayAnchor.BottomRight);
-            var miniPosition = Submenu("Mini Indicator Position");
-            foreach (OverlayAnchor anchor in MiniIndicatorAnchors)
-            {
-                OverlayAnchor value = anchor;
-                miniPosition.DropDownItems.Add(Item(AnchorLabel(anchor), miniAnchor == anchor, () => SetMiniIndicatorAnchor(value)));
-            }
-            overlayMenu.DropDownItems.Add(miniPosition);
-
-            OverlaySize miniSize = OverlayPlacement.ParseEnum(settings.miniIndicatorSize, OverlaySize.Medium);
-            var miniSizeMenu = Submenu("Mini Indicator Size");
-            foreach (OverlaySize option in Enum.GetValues(typeof(OverlaySize)))
-            {
-                OverlaySize value = option;
-                miniSizeMenu.DropDownItems.Add(Item(option.ToString(), miniSize == option, () =>
-                {
-                    settings.miniIndicatorSize = value.ToString();
-                    SaveAndApplyOverlaySettings();
-                }));
-            }
-            overlayMenu.DropDownItems.Add(miniSizeMenu);
-
-            overlayMenu.DropDownItems.Add(new ToolStripSeparator());
-            overlayMenu.DropDownItems.Add(Item("Unlock Positions (drag to move)", moveMode, () => SetMoveMode(!moveMode)));
-            overlayMenu.DropDownItems.Add(Item("Reset Positions", false, ResetPositions));
-            return overlayMenu;
         }
 
-        private ToolStripMenuItem BuildMonitorMenu()
+        internal static string DisplayTimeLabel(int ms)
         {
-            var monitorMenu = Submenu("Monitor");
+            if (ms == StatusOverlayForm.AlwaysVisible)
+                return "Always visible";
+            return ms == 1000 ? "1 second" : (ms / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " seconds";
+        }
+
+        // Monitor choices: value (setting) and label.
+        internal static IReadOnlyList<KeyValuePair<string, string>> MonitorChoices()
+        {
+            var choices = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>(OverlayPlacement.PrimaryMonitor, "Primary monitor"),
+                new KeyValuePair<string, string>(OverlayPlacement.FollowMouseMonitor, "Monitor under the mouse"),
+            };
+            foreach (ScreenInfo screen in ScreenInfo.All())
+            {
+                string label = $"{DisplayLabel(screen.DeviceName)} ({screen.Bounds.Width}x{screen.Bounds.Height}{(screen.IsPrimary ? ", primary" : string.Empty)})";
+                choices.Add(new KeyValuePair<string, string>(screen.DeviceName, label));
+            }
+            return choices;
+        }
+
+        // The monitor setting, mapped to Primary when the saved monitor is not connected.
+        internal string CurrentMonitorChoice()
+        {
             string current = settings.overlayMonitor ?? OverlayPlacement.PrimaryMonitor;
-            IReadOnlyList<ScreenInfo> screens = ScreenInfo.All();
-            bool knownMonitor = current == OverlayPlacement.PrimaryMonitor || current == OverlayPlacement.FollowMouseMonitor
-                || screens.Any(s => string.Equals(s.DeviceName, current, StringComparison.OrdinalIgnoreCase));
-
-            monitorMenu.DropDownItems.Add(Item("Primary", current == OverlayPlacement.PrimaryMonitor || !knownMonitor, () => SetMonitor(OverlayPlacement.PrimaryMonitor)));
-            monitorMenu.DropDownItems.Add(Item("Follow Mouse", current == OverlayPlacement.FollowMouseMonitor, () => SetMonitor(OverlayPlacement.FollowMouseMonitor)));
-            monitorMenu.DropDownItems.Add(new ToolStripSeparator());
-            foreach (ScreenInfo screen in screens)
-            {
-                string deviceName = screen.DeviceName;
-                string label = $"{DisplayLabel(deviceName)} ({screen.Bounds.Width}x{screen.Bounds.Height}{(screen.IsPrimary ? ", primary" : string.Empty)})";
-                monitorMenu.DropDownItems.Add(Item(label, string.Equals(current, deviceName, StringComparison.OrdinalIgnoreCase), () => SetMonitor(deviceName)));
-            }
-            return monitorMenu;
+            return MonitorChoices().Any(c => string.Equals(c.Key, current, StringComparison.OrdinalIgnoreCase)) ? current : OverlayPlacement.PrimaryMonitor;
         }
 
-        private void SetOverlayAnchor(OverlayAnchor anchor)
+        internal void SetShowOverlay(bool show)
+        {
+            settings.showGui = show;
+            SaveAndApplyOverlaySettings();
+            if (show)
+                overlay.ShowTransient();
+        }
+
+        internal void SetOverlayAnchor(OverlayAnchor anchor)
         {
             settings.overlayPosition = anchor.ToString();
             SaveAndApplyOverlaySettings();
             if (anchor == OverlayAnchor.Custom)
-                SetMoveMode(true);
+                SetPositionsUnlocked(true);
             else
                 overlay.ShowTransient();
         }
 
-        private void SetMiniIndicatorAnchor(OverlayAnchor anchor)
+        internal void SetOverlaySize(OverlaySize size)
         {
-            settings.miniIndicatorPosition = anchor.ToString();
-            if (!settings.miniIndicatorEnabled)
-                settings.miniIndicatorEnabled = true;
+            settings.overlaySize = size.ToString();
             SaveAndApplyOverlaySettings();
-            if (anchor == OverlayAnchor.Custom)
-                SetMoveMode(true);
+            overlay.ShowTransient();
         }
 
-        private void SetMonitor(string monitor)
+        internal void SetDisplayTime(int ms)
+        {
+            settings.overlayDurationMs = ms;
+            SaveAndApplyOverlaySettings();
+            overlay.ShowTransient();
+        }
+
+        internal void SetMonitor(string monitor)
         {
             settings.overlayMonitor = monitor;
             SaveAndApplyOverlaySettings();
             overlay.ShowTransient();
         }
 
-        private void SetMoveMode(bool enabled)
+        internal void SetMiniIndicatorEnabled(bool enabled)
         {
-            moveMode = enabled;
-            overlay.SetMoveMode(enabled);
-            miniIndicator.SetMoveMode(enabled);
-            if (enabled && !settings.showGui && !settings.miniIndicatorEnabled)
-                ShowBalloon("Nothing to move", "Turn on \"Show Overlay\" or \"Mini Indicator\" first.", ToolTipIcon.Info);
-            else if (!enabled)
-                overlay.ShowTransient();
+            settings.miniIndicatorEnabled = enabled;
+            SaveAndApplyOverlaySettings();
         }
 
-        private void ResetPositions()
+        internal void SetMiniIndicatorAnchor(OverlayAnchor anchor)
+        {
+            settings.miniIndicatorPosition = anchor.ToString();
+            if (!settings.miniIndicatorEnabled)
+                settings.miniIndicatorEnabled = true;
+            SaveAndApplyOverlaySettings();
+            if (anchor == OverlayAnchor.Custom)
+                SetPositionsUnlocked(true);
+        }
+
+        internal void SetMiniIndicatorSize(OverlaySize size)
+        {
+            settings.miniIndicatorSize = size.ToString();
+            SaveAndApplyOverlaySettings();
+        }
+
+        // While unlocked, the overlay and the mini indicator stay visible and can be dragged.
+        internal void SetPositionsUnlocked(bool unlocked)
+        {
+            if (moveMode == unlocked || shutDown)
+                return;
+            moveMode = unlocked;
+            overlay.SetMoveMode(unlocked);
+            miniIndicator.SetMoveMode(unlocked);
+            if (!unlocked)
+                overlay.ShowTransient();
+            RaiseSettingsChanged();
+        }
+
+        internal void ResetPositions()
         {
             settings.overlayPosition = OverlayAnchor.LowerCenter.ToString();
             settings.overlayMonitor = OverlayPlacement.PrimaryMonitor;
@@ -627,16 +646,6 @@ namespace Muter.UI
             miniIndicator.Configure(settings.miniIndicatorEnabled);
         }
 
-        private static string AnchorLabel(OverlayAnchor anchor)
-        {
-            switch (anchor)
-            {
-                case OverlayAnchor.LowerCenter: return "Lower Center (default)";
-                case OverlayAnchor.Custom: return "Custom (drag to move)";
-                default: return Regex.Replace(anchor.ToString(), "(?<=[a-z])(?=[A-Z])", " ");
-            }
-        }
-
         private static string DisplayLabel(string deviceName)
         {
             Match number = Regex.Match(deviceName ?? string.Empty, @"(\d+)$");
@@ -645,24 +654,68 @@ namespace Muter.UI
 
         #endregion
 
+        #region Settings window
+
+        // Opens the settings window, or brings it to the front if it is already open.
+        internal SettingsForm OpenSettings()
+        {
+            if (shutDown)
+                return null;
+            if (settingsForm != null && !settingsForm.IsDisposed)
+            {
+                if (settingsForm.WindowState == FormWindowState.Minimized)
+                    settingsForm.WindowState = FormWindowState.Normal;
+                settingsForm.Activate();
+                return settingsForm;
+            }
+
+            settingsForm = new SettingsForm(this);
+            settingsForm.FormClosed += (s, e) =>
+            {
+                settingsForm = null;
+                // Never leave the overlays draggable after the settings are closed.
+                SetPositionsUnlocked(false);
+            };
+            settingsForm.Show();
+            return settingsForm;
+        }
+
+        internal SettingsForm SettingsWindow => settingsForm != null && !settingsForm.IsDisposed ? settingsForm : null;
+
+        private void RaiseSettingsChanged()
+        {
+            try
+            {
+                SettingsChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Updating the settings window failed", ex);
+            }
+        }
+
+        #endregion
+
         #region Hotkey and startup
+
+        internal Hotkey ConfiguredHotkey => configuredHotkey;
 
         private void RegisterConfiguredHotkey(bool notifyOnFailure)
         {
             if (shutDown)
                 return;
-            configuredHotkey =Hotkey.TryFromSettings(settings.hotkeyKey, settings.hotkeyModifiers, out Hotkey fromSettings)
+            configuredHotkey = Hotkey.TryFromSettings(settings.hotkeyKey, settings.hotkeyModifiers, out Hotkey fromSettings)
                 ? fromSettings
                 : Hotkey.Default;
             if (hotkey.IsRegistered && hotkey.Current.Equals(configuredHotkey))
                 return;
             if (!hotkey.TrySet(configuredHotkey, out string error) && notifyOnFailure)
-                ShowBalloon("Hotkey is not active", error + " Right-click the tray icon and choose Hotkey to pick another.", ToolTipIcon.Warning);
+                ShowBalloon("Hotkey is not active", error + " Open Settings from the tray icon to pick another.", ToolTipIcon.Warning);
         }
 
-        private void OpenHotkeyDialog()
+        internal void OpenHotkeyDialog(IWin32Window owner = null)
         {
-            if (hotkeyDialogOpen)
+            if (hotkeyDialogOpen || shutDown)
                 return;
             hotkeyDialogOpen = true;
             // Release the hotkey so pressing it while choosing a new one does not toggle the microphone.
@@ -670,12 +723,17 @@ namespace Muter.UI
             try
             {
                 using (var form = new HotkeyForm(configuredHotkey, TryApplyHotkey))
-                    form.ShowDialog();
+                {
+                    if (owner != null)
+                        form.StartPosition = FormStartPosition.CenterParent;
+                    form.ShowDialog(owner);
+                }
             }
             finally
             {
                 hotkeyDialogOpen = false;
                 RegisterConfiguredHotkey(notifyOnFailure: true);
+                RaiseSettingsChanged();
             }
         }
 
@@ -691,7 +749,7 @@ namespace Muter.UI
             return null;
         }
 
-        private bool SafeIsStartupEnabled()
+        internal bool IsStartupEnabled()
         {
             try
             {
@@ -704,17 +762,18 @@ namespace Muter.UI
             }
         }
 
-        private void ToggleStartup()
+        internal void SetStartup(bool enabled)
         {
             try
             {
-                startup.SetEnabled(!startup.IsEnabled());
+                startup.SetEnabled(enabled);
             }
             catch (Exception ex)
             {
                 Log.Error("Could not change the startup setting", ex);
                 MessageBox.Show("Could not change the startup setting:\n" + ex.Message, "Muter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+            RaiseSettingsChanged();
         }
 
         private void RepairStartupEntry()
@@ -737,6 +796,7 @@ namespace Muter.UI
         {
             var item = new ToolStripMenuItem(text);
             item.DropDown.Font = menuFont;
+            item.DropDown.Renderer = menu.Renderer;
             return item;
         }
 
@@ -779,6 +839,7 @@ namespace Muter.UI
             {
                 Log.Error("Could not save the settings", ex);
             }
+            RaiseSettingsChanged();
         }
 
         private void ShowBalloon(string title, string text, ToolTipIcon icon)
@@ -818,6 +879,7 @@ namespace Muter.UI
                 Log.Warn("Could not release the hotkey", ex);
             }
 
+            SettingsWindow?.Close();
             trayIcon.Visible = false;
             trayIcon.Dispose();
             DisposeItems(menu.Items);

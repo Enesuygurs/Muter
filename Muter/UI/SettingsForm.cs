@@ -369,7 +369,7 @@ namespace Muter.UI
 
             AddSection(page, Lang.SectionHotkey, ref y);
             var hotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
-            HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Cursor = Cursors.Default, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
             ChangeHotkeyButton = new FlatButton { Text = Lang.Change, Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
             ChangeHotkeyButton.Click += (s, e) => app.OpenHotkeyDialog(this);
             hotkeyPanel.Controls.Add(HotkeyKeys);

@@ -270,7 +270,7 @@ namespace Muter.Tests
                     app.RefreshNow(); // the audio thread gets stuck in a read
                     Thread.Sleep(100);
                     var watch = System.Diagnostics.Stopwatch.StartNew();
-                    Assert.NotNull(FindItem(app, "Devices", "(Failed to list devices)"));
+                    Assert.NotNull(FindItem(app, "Devices", "(Could not list the microphones)"));
                     Assert.True(watch.ElapsedMilliseconds < 2500, "menu opened in " + watch.ElapsedMilliseconds + " ms");
                     provider.BlockReads = null;
                     gate.Set();

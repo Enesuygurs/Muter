@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Muter.Hotkeys;
+using Muter.Localization;
 using Muter.UI.Controls;
 
 namespace Muter.UI
@@ -51,6 +52,7 @@ namespace Muter.UI
         public HotkeyForm(Hotkey currentHotkey, Func<Hotkey, string> applyHotkey)
         {
             InitializeComponent();
+            ApplyLanguage();
             this.applyHotkey = applyHotkey ?? throw new ArgumentNullException(nameof(applyHotkey));
             this.currentHotkey = currentHotkey;
             Icon = AppResources.AppIcon;
@@ -60,6 +62,27 @@ namespace Muter.UI
             closeButton.Click += (s, e) => Close();
             cancelButton.Click += (s, e) => Close();
             ShowCurrent();
+        }
+
+        private void ApplyLanguage()
+        {
+            Strings text = Strings.Current;
+            Text = text.HotkeyWindowTitle;
+            titleLabel.Text = text.MuteHotkey;
+            descriptionLabel.Text = text.HotkeyDescription;
+            captureBox.Placeholder = text.HotkeyPlaceholder;
+            cancelButton.Text = text.Cancel;
+            saveButton.Text = text.Save;
+            resetButton.Text = text.ResetToDefault;
+
+            // Buttons grow for longer translations, keeping their right edge; the link may use the space up to them.
+            int right = saveButton.Right;
+            saveButton.Width = Math.Max(saveButton.Width, TextRenderer.MeasureText(saveButton.Text, saveButton.Font).Width + 28);
+            saveButton.Left = right - saveButton.Width;
+            cancelButton.Width = Math.Max(cancelButton.Width, TextRenderer.MeasureText(cancelButton.Text, cancelButton.Font).Width + 28);
+            cancelButton.Left = saveButton.Left - 8 - cancelButton.Width;
+            int needed = TextRenderer.MeasureText(resetButton.Text, resetButton.Font).Width + 12;
+            resetButton.Width = Math.Min(cancelButton.Left - resetButton.Left - 8, Math.Max(resetButton.Width, needed));
         }
 
         // Test access.
@@ -153,9 +176,9 @@ namespace Muter.UI
             if (problem != null)
                 ShowResult(KeyCaptureState.Invalid, problem, canSave: false);
             else if (hotkey.Equals(currentHotkey))
-                ShowResult(KeyCaptureState.Idle, "This is your current hotkey. Press another combination to change it.", canSave: false);
+                ShowResult(KeyCaptureState.Idle, Strings.Current.HotkeyIsCurrent, canSave: false);
             else
-                ShowResult(KeyCaptureState.Valid, $"Press Save to use {HotkeyText.Format(hotkey)}.", canSave: true);
+                ShowResult(KeyCaptureState.Valid, string.Format(Strings.Current.HotkeyPressSave, HotkeyText.Format(hotkey)), canSave: true);
         }
 
         internal void Save()
@@ -181,12 +204,12 @@ namespace Muter.UI
             if (currentHotkey.IsValid)
             {
                 captureBox.Keycaps = HotkeyText.Parts(currentHotkey);
-                ShowResult(KeyCaptureState.Idle, "Current hotkey. Press a new combination to change it.", canSave: false);
+                ShowResult(KeyCaptureState.Idle, Strings.Current.HotkeyCurrent, canSave: false);
             }
             else
             {
                 captureBox.Keycaps = null;
-                ShowResult(KeyCaptureState.Idle, "Press a key combination, for example Ctrl + Shift + F9.", canSave: false);
+                ShowResult(KeyCaptureState.Idle, string.Format(Strings.Current.HotkeyExample, HotkeyText.Format(Hotkey.Default)), canSave: false);
             }
         }
 
@@ -201,7 +224,7 @@ namespace Muter.UI
                 return;
             }
             captureBox.Keycaps = HotkeyText.ModifierParts(modifiers);
-            ShowResult(KeyCaptureState.Pending, "Now press the key to combine with it.", canSave: false);
+            ShowResult(KeyCaptureState.Pending, Strings.Current.HotkeyPending, canSave: false);
         }
 
         private void ShowResult(KeyCaptureState state, string message, bool canSave)

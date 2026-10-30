@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Muter.Localization;
 
 namespace Muter.Hotkeys
 {
@@ -47,7 +48,7 @@ namespace Muter.Hotkeys
         {
             if (!hotkey.IsValid)
             {
-                error = "Please choose a valid key combination.";
+                error = Strings.Current.HotkeyChooseValid;
                 return false;
             }
 
@@ -73,7 +74,7 @@ namespace Muter.Hotkeys
                 return true;
             if (!Current.IsValid)
             {
-                error = "No hotkey is configured.";
+                error = Strings.Current.HotkeyNotConfigured;
                 return false;
             }
             return Register(Current, out error);
@@ -114,8 +115,8 @@ namespace Muter.Hotkeys
 
             int code = Marshal.GetLastWin32Error();
             error = code == 1409 // ERROR_HOTKEY_ALREADY_REGISTERED
-                ? $"{HotkeyText.Format(hotkey)} is already used by another app. Try another combination."
-                : $"{HotkeyText.Format(hotkey)} could not be registered: {new Win32Exception(code).Message}";
+                ? string.Format(Strings.Current.HotkeyTaken, HotkeyText.Format(hotkey))
+                : string.Format(Strings.Current.HotkeyRegisterFailed, HotkeyText.Format(hotkey), new Win32Exception(code).Message);
             Log.Warn(error);
             return false;
         }

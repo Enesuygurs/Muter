@@ -306,6 +306,12 @@ namespace Muter.UI
         {
             Panel page = NewPage(PageGeneral, Lang.PageGeneral, out int y);
 
+            AddSection(page, Lang.SectionStartup, ref y);
+            StartupToggle = new ToggleSwitch();
+            StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
+            AddRow(page, Lang.StartWithWindows, Lang.StartWithWindowsHint, StartupToggle, ref y);
+
+            y += 6;
             AddSection(page, Lang.SectionMicrophone, ref y);
             DevicesDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             DevicesDropdown.DropDownOpening += (s, e) => RefreshDeviceOptions();
@@ -320,12 +326,6 @@ namespace Muter.UI
             SyncToggle = new ToggleSwitch();
             SyncToggle.Toggled += (s, e) => Apply(() => app.SetSyncDevices(SyncToggle.Checked));
             AddRow(page, Lang.KeepInSync, Lang.KeepInSyncHint, SyncToggle, ref y);
-
-            y += 6;
-            AddSection(page, Lang.SectionStartup, ref y);
-            StartupToggle = new ToggleSwitch();
-            StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
-            AddRow(page, Lang.StartWithWindows, Lang.StartWithWindowsHint, StartupToggle, ref y);
 
             // Settings shared by the overlay and the mini indicator.
             y += 6;

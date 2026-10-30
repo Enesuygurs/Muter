@@ -147,7 +147,7 @@
             this.Controls.Add(this.closeButton);
             this.Controls.Add(this.titleLabel);
             this.Controls.Add(this.iconBox);
-            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.Font = new System.Drawing.Font("Segoe UI Semibold", 9F);
             this.ForeColor = System.Drawing.Color.FromArgb(243, 243, 243);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.KeyPreview = true;

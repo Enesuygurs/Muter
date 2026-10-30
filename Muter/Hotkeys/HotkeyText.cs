@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Muter.Localization;
 
 namespace Muter.Hotkeys
 {
@@ -83,12 +84,12 @@ namespace Muter.Hotkeys
         public static string Problem(Hotkey hotkey)
         {
             if (!hotkey.IsValid)
-                return "That key can't be used as a hotkey.";
+                return Strings.Current.HotkeyInvalidKey;
             if (IsReservedBySystem(hotkey))
-                return $"{Format(hotkey)} is reserved by Windows. Try another combination.";
+                return string.Format(Strings.Current.HotkeyReserved, Format(hotkey));
             bool ctrlOrAlt = (hotkey.Modifiers & (HotkeyModifiers.Control | HotkeyModifiers.Alt)) != 0;
             if (!ctrlOrAlt && !CanBeUsedWithoutCtrlOrAlt(hotkey.Key))
-                return $"Add Ctrl or Alt: {Format(hotkey)} would stop working for typing in other apps.";
+                return string.Format(Strings.Current.HotkeyNeedsCtrlOrAlt, Format(hotkey));
             return null;
         }
 

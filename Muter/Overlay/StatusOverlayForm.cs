@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Muter.Localization;
 using Muter.UI;
 
 namespace Muter.Overlay
@@ -101,7 +102,7 @@ namespace Muter.Overlay
             g.FillRectangle(Brushes.Black, stateBar);
 
             const TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
-            TextRenderer.DrawText(g, MoveMode ? "Drag to move" : presentation.Title, font, titleBar, Color.White, Color.Black, flags);
+            TextRenderer.DrawText(g, MoveMode ? Strings.Current.DragToMove : presentation.Title, font, titleBar, Color.White, Color.Black, flags);
             TextRenderer.DrawText(g, presentation.StateText, font, stateBar, Color.White, Color.Black, flags);
 
             Image image = presentation.ShowsMuted ? AppResources.ImageMuted

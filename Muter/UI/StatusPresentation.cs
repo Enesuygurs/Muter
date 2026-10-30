@@ -1,4 +1,5 @@
 using Muter.Audio;
+using Muter.Localization;
 
 namespace Muter.UI
 {
@@ -36,32 +37,34 @@ namespace Muter.UI
 
         public static StatusPresentation From(MicrophoneStatus status, bool allDevicesMode)
         {
-            string title = allDevicesMode ? "All Devices" : "Microphone";
+            Strings text = Strings.Current;
+            string title = allDevicesMode ? text.AllMicrophones : text.Microphone;
             string device = allDevicesMode
-                ? "All Devices"
-                : status.DeviceNames.Count == 0 ? "Microphone"
+                ? text.DeviceAll
+                : status.DeviceNames.Count == 0 ? text.Microphone
                 : status.DeviceNames.Count == 1 ? status.DeviceNames[0]
                 : $"{status.DeviceNames[0]} +{status.DeviceNames.Count - 1}";
 
             switch (status.State)
             {
                 case MicState.Muted:
-                    return new StatusPresentation(title, "OFF", StatusVisual.Muted, FormatTooltip($"{device}: OFF"));
+                    return new StatusPresentation(title, text.StateOff, StatusVisual.Muted, FormatTooltip($"{device}: {text.StateOff}"));
                 case MicState.Live:
-                    string detail = status.MutedCount > 0 ? $"ON ({status.LiveCount} of {status.DeviceCount} live)" : "ON";
-                    return new StatusPresentation(title, "ON", StatusVisual.Live, FormatTooltip($"{device}: {detail}"));
+                    string detail = status.MutedCount > 0 ? string.Format(text.TipPartlyLive, status.LiveCount, status.DeviceCount) : text.StateOn;
+                    return new StatusPresentation(title, text.StateOn, StatusVisual.Live, FormatTooltip($"{device}: {detail}"));
                 case MicState.NoDevice:
-                    return new StatusPresentation(title, "No Device", StatusVisual.NoDevice, FormatTooltip("No Device"));
+                    return new StatusPresentation(title, text.StateNoDevice, StatusVisual.NoDevice, FormatTooltip(text.StateNoDevice));
                 default:
-                    return new StatusPresentation(title, "UNKNOWN", StatusVisual.Unknown, FormatTooltip("state unknown, assume ON"));
+                    return new StatusPresentation(title, text.StateUnknown, StatusVisual.Unknown, FormatTooltip(text.TipUnknown));
             }
         }
 
         // Shown while an audio call is stuck: the last known state may no longer be true.
         public static StatusPresentation NotResponding(bool allDevicesMode)
         {
-            return new StatusPresentation(allDevicesMode ? "All Devices" : "Microphone", "UNKNOWN", StatusVisual.Unknown,
-                FormatTooltip("audio system not responding, assume ON"));
+            Strings text = Strings.Current;
+            return new StatusPresentation(allDevicesMode ? text.AllMicrophones : text.Microphone, text.StateUnknown, StatusVisual.Unknown,
+                FormatTooltip(text.TipNotResponding));
         }
 
         private static string FormatTooltip(string text)

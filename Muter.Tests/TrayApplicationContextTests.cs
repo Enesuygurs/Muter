@@ -7,9 +7,11 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using Muter.Audio;
 using Muter.Hotkeys;
+using Muter.Overlay;
 using Muter.Properties;
 using Muter.Tests.Fakes;
 using Muter.UI;
+using Muter.UI.Controls;
 using Xunit;
 
 namespace Muter.Tests
@@ -201,7 +203,7 @@ namespace Muter.Tests
                     Assert.True(app.OverlayWindow.Visible);
 
                     // The UI thread stays responsive meanwhile.
-                    Assert.True(FindItem(app, "Overlay").DropDownItems.Count > 0);
+                    Assert.NotNull(FindItem(app, "Settings..."));
 
                     provider.BlockReads = null;
                     gate.Set();
@@ -276,8 +278,40 @@ namespace Muter.Tests
             });
         }
 
+        private static SettingsForm OpenSettings(TrayApplicationContext app)
+        {
+            SettingsForm form = app.OpenSettings();
+            Application.DoEvents();
+            return form;
+        }
+
         [Fact]
-        public void Sync_menu_item_toggles_on_and_off()
+        public void Tray_menu_is_short_dark_and_opens_a_single_settings_window()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                app.RebuildMenu();
+                Assert.Equal(new[] { "Devices", "Settings...", "Exit" }, app.Menu.Items.OfType<ToolStripMenuItem>().Select(i => i.Text).ToArray());
+                Assert.IsType<DarkMenuRenderer>(app.Menu.Renderer);
+
+                FindItem(app, "Settings...").PerformClick();
+                SettingsForm first = app.SettingsWindow;
+                Assert.NotNull(first);
+                Assert.True(first.Visible);
+                Assert.Equal("General", first.CurrentPage);
+
+                FindItem(app, "Settings...").PerformClick();
+                Assert.Same(first, app.SettingsWindow); // brought to front, not opened twice
+
+                Assert.True(ProcessDialogKey(first, Keys.Escape));
+                Application.DoEvents();
+                Assert.Null(app.SettingsWindow);
+            });
+        }
+
+        [Fact]
+        public void Sync_switch_turns_syncing_on_and_off()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
             provider.Add("b", muted: true);
@@ -288,16 +322,19 @@ namespace Muter.Tests
             });
             WithApp(provider, settings, (app, hotkey) =>
             {
-                Assert.False(FindItem(app, "Sync Devices").Checked);
+                SettingsForm form = OpenSettings(app);
+                Assert.False(form.SyncToggle.Checked);
                 Assert.Equal(MicState.Live, app.Status.State); // mixed, not synced
 
-                Click(app, "Sync Devices");
+                form.SyncToggle.Toggle();
+                app.WaitForAudio();
                 Assert.True(settings.syncDevices);
-                Assert.True(FindItem(app, "Sync Devices").Checked);
+                Assert.True(form.SyncToggle.Checked);
                 Assert.True(provider.Devices.All(d => d.Muted)); // aligned (no history: muted)
                 Assert.Equal(MicState.Muted, app.Status.State);
 
-                Click(app, "Sync Devices");
+                form.SyncToggle.Toggle();
+                app.WaitForAudio();
                 Assert.False(settings.syncDevices);
                 provider.Get("a").Muted = false;
                 app.RefreshNow();
@@ -308,13 +345,44 @@ namespace Muter.Tests
         }
 
         [Fact]
-        public void Hidden_overlay_stays_hidden_but_tray_still_updates()
+        public void Devices_dropdown_lists_and_selects_microphones()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            provider.Add("b", name: "Array");
+            Settings settings = NewSettings();
+            WithApp(provider, settings, (app, hotkey) =>
+            {
+                SettingsForm form = OpenSettings(app);
+                Assert.Equal(new[] { "Default (System)", "All Devices", "Headset", "Array" }, form.DevicesDropdown.Options.Select(o => o.Text).ToArray());
+                Assert.Equal("Default (System)", form.DevicesDropdown.SelectedText);
+
+                form.DevicesDropdown.Choose("b");
+                app.WaitForAudio();
+                Assert.Equal("b", settings.selectedDeviceId);
+                Assert.Equal("Array", settings.selectedDeviceName);
+                Press(app, hotkey);
+                Assert.True(provider.Get("b").Muted);
+                Assert.False(provider.Get("a").Muted);
+
+                form.DevicesDropdown.Choose(string.Empty);
+                Assert.Equal(string.Empty, settings.selectedDeviceId);
+
+                // A choice made in the tray menu shows up in the open window.
+                Click(app, "Devices", "All Devices");
+                Assert.Equal("All Devices", form.DevicesDropdown.SelectedText);
+            });
+        }
+
+        [Fact]
+        public void Show_overlay_switch_hides_the_overlay_but_the_tray_still_updates()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
             Settings settings = NewSettings();
             WithApp(provider, settings, (app, hotkey) =>
             {
-                Click(app, "Overlay", "Show Overlay");
+                SettingsForm form = OpenSettings(app);
+                Assert.True(form.ShowOverlayToggle.Checked);
+                form.ShowOverlayToggle.Toggle();
                 Assert.False(settings.showGui);
                 Assert.False(app.OverlayWindow.Visible);
 
@@ -331,13 +399,16 @@ namespace Muter.Tests
             Settings settings = NewSettings();
             WithApp(provider, settings, (app, hotkey) =>
             {
-                Click(app, "Overlay", "Display Time", "0.5 s");
+                SettingsForm form = OpenSettings(app);
+                Assert.Equal("1 second", form.DisplayTimeDropdown.SelectedText);
+                form.DisplayTimeDropdown.Choose(500);
                 Assert.Equal(500, settings.overlayDurationMs);
                 Press(app, hotkey);
                 Assert.True(app.OverlayWindow.Visible);
                 Assert.True(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 2000));
 
-                Click(app, "Overlay", "Display Time", "Always Visible");
+                form.DisplayTimeDropdown.Choose(StatusOverlayForm.AlwaysVisible);
+                Assert.Equal("Always visible", form.DisplayTimeDropdown.SelectedText);
                 Assert.True(app.OverlayWindow.Visible);
                 Press(app, hotkey);
                 Assert.False(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 1500));
@@ -346,92 +417,199 @@ namespace Muter.Tests
         }
 
         [Fact]
-        public void Position_size_and_monitor_menus_move_the_overlay()
+        public void Position_size_and_monitor_settings_move_the_overlay()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
             Settings settings = NewSettings();
             WithApp(provider, settings, (app, hotkey) =>
             {
+                SettingsForm form = OpenSettings(app);
+                form.ShowPage("Overlay");
                 Screen primary = Screen.PrimaryScreen;
-                Click(app, "Overlay", "Position", "Top Left");
+                form.PositionDropdown.Choose(OverlayAnchor.TopLeft);
                 Assert.Equal("TopLeft", settings.overlayPosition);
                 Assert.True(primary.WorkingArea.Contains(app.OverlayWindow.Bounds));
                 Point topLeft = app.OverlayWindow.Location;
 
-                Click(app, "Overlay", "Position", "Bottom Right");
+                form.PositionDropdown.Choose(OverlayAnchor.BottomRight);
                 Assert.True(primary.WorkingArea.Contains(app.OverlayWindow.Bounds));
                 Assert.True(app.OverlayWindow.Left > topLeft.X && app.OverlayWindow.Top > topLeft.Y);
 
                 Size medium = app.OverlayWindow.Size;
-                Click(app, "Overlay", "Size", "Large");
+                form.SizeSegments.Choose(2);
                 Assert.Equal("Large", settings.overlaySize);
                 Assert.Equal(Math.Round(medium.Width * 1.5), app.OverlayWindow.Width, 0);
-                Click(app, "Overlay", "Size", "Small");
+                form.SizeSegments.Choose(0);
                 Assert.Equal(Math.Round(medium.Width * 0.75), app.OverlayWindow.Width, 0);
 
                 foreach (Screen screen in Screen.AllScreens)
                 {
-                    Click(app, "Overlay", "Monitor", "Display " + new string(screen.DeviceName.Reverse().TakeWhile(char.IsDigit).Reverse().ToArray()));
+                    form.MonitorDropdown.Choose(screen.DeviceName);
                     Assert.Equal(screen.DeviceName, settings.overlayMonitor);
                     Assert.True(screen.WorkingArea.Contains(app.OverlayWindow.Bounds), screen.DeviceName);
                 }
 
-                Click(app, "Overlay", "Monitor", "Primary");
+                form.MonitorDropdown.Choose(OverlayPlacement.PrimaryMonitor);
+                Assert.Equal("Primary monitor", form.MonitorDropdown.SelectedText);
                 Assert.True(primary.WorkingArea.Contains(app.OverlayWindow.Bounds));
+
+                // Choosing Custom unlocks the overlays for dragging.
+                form.PositionDropdown.Choose(OverlayAnchor.Custom);
+                Assert.True(app.PositionsUnlocked);
+                Assert.Equal("Done", form.MovePositionsButton.Text);
             });
         }
 
         [Fact]
-        public void Mini_indicator_menu_and_unlock_and_reset()
+        public void Mini_indicator_unlock_and_reset_through_settings()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
             Settings settings = NewSettings();
             WithApp(provider, settings, (app, hotkey) =>
             {
+                SettingsForm form = OpenSettings(app);
                 Assert.False(app.MiniIndicator.Visible);
-                Click(app, "Overlay", "Mini Indicator");
+                form.MiniIndicatorToggle.Toggle();
                 Assert.True(settings.miniIndicatorEnabled);
                 Assert.True(app.MiniIndicator.Visible);
 
-                Click(app, "Overlay", "Mini Indicator Position", "Top Left");
+                form.MiniPositionDropdown.Choose(OverlayAnchor.TopLeft);
                 Rectangle area = Screen.PrimaryScreen.WorkingArea;
                 Assert.True(area.Contains(app.MiniIndicator.Bounds));
                 Assert.True(app.MiniIndicator.Left < area.Left + 100 && app.MiniIndicator.Top < area.Top + 100);
 
                 Size medium = app.MiniIndicator.Size;
-                Click(app, "Overlay", "Mini Indicator Size", "Large");
+                form.MiniSizeSegments.Choose(2);
                 Assert.True(app.MiniIndicator.Width > medium.Width);
 
-                Click(app, "Overlay", "Unlock Positions");
+                form.ShowPage("General"); // Monitor and Positions are shared by both windows
+                Assert.Equal("Move", form.MovePositionsButton.Text);
+                form.MovePositionsButton.PerformClick();
+                Assert.Equal("Done", form.MovePositionsButton.Text);
                 Assert.True(app.PositionsUnlocked);
                 Assert.True(app.OverlayWindow.MoveMode && app.MiniIndicator.MoveMode);
                 Assert.True(app.OverlayWindow.Visible);
                 Assert.False(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 1500)); // stays while unlocked
 
-                Click(app, "Overlay", "Unlock Positions");
-                Assert.False(app.OverlayWindow.MoveMode || app.MiniIndicator.MoveMode);
-
                 settings.overlayPosition = "Custom";
-                Click(app, "Overlay", "Reset Positions");
+                form.ResetPositionsButton.PerformClick();
                 Assert.Equal("LowerCenter", settings.overlayPosition);
                 Assert.Equal("BottomRight", settings.miniIndicatorPosition);
+                Assert.Equal(OverlayAnchor.LowerCenter, form.PositionDropdown.SelectedValue);
+
+                // Closing the settings never leaves the overlays draggable.
+                form.Close();
+                Application.DoEvents();
+                Assert.False(app.PositionsUnlocked);
+                Assert.False(app.OverlayWindow.MoveMode || app.MiniIndicator.MoveMode);
             });
         }
 
         [Fact]
-        public void Run_startup_menu_item_toggles_the_registry_entry()
+        public void Positions_row_moves_both_windows_and_is_unavailable_when_nothing_is_shown()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            Settings settings = NewSettings(s => s.miniIndicatorEnabled = true);
+            WithApp(provider, settings, (app, hotkey) =>
+            {
+                SettingsForm form = OpenSettings(app);
+                Assert.Equal("General", form.CurrentPage);
+
+                form.MovePositionsButton.PerformClick();
+                Assert.True(app.PositionsUnlocked);
+                Assert.True(app.OverlayWindow.MoveMode && app.MiniIndicator.MoveMode);
+                Assert.Equal("Done", form.MovePositionsButton.Text);
+                Assert.Equal(FlatButtonStyle.Primary, form.MovePositionsButton.ButtonStyle);
+
+                form.MovePositionsButton.PerformClick(); // Done
+                Assert.False(app.PositionsUnlocked);
+                Assert.Equal("Move", form.MovePositionsButton.Text);
+
+                app.SetShowOverlay(false);
+                app.SetMiniIndicatorEnabled(false);
+                Assert.False(form.MovePositionsButton.Enabled);
+                form.MovePositionsButton.PerformClick();
+                Assert.False(app.PositionsUnlocked);
+
+                form.ShowPage("Overlay");
+                form.ShowOverlayToggle.Toggle();
+                Assert.True(form.MovePositionsButton.Enabled);
+            });
+        }
+
+        [Fact]
+        public void Switch_raises_its_event_only_for_the_user_and_finishes_its_animation()
+        {
+            TestSetup.RunSta(() =>
+            {
+                using (var host = new Form())
+                {
+                    var toggle = new ToggleSwitch();
+                    host.Controls.Add(toggle);
+                    host.Show();
+                    int raised = 0;
+                    toggle.Toggled += (s, e) => raised++;
+
+                    toggle.Checked = true; // from code: no event
+                    Assert.Equal(0, raised);
+
+                    toggle.Toggle(); // user: one event
+                    Assert.False(toggle.Checked);
+                    Assert.Equal(1, raised);
+                    TestSetup.PumpUntil(() => false, 300); // the animation completes and stops
+                    using (var bitmap = new Bitmap(toggle.Width, toggle.Height))
+                        toggle.DrawToBitmap(bitmap, new Rectangle(Point.Empty, toggle.Size));
+
+                    toggle.Enabled = false;
+                    toggle.Toggle();
+                    Assert.False(toggle.Checked);
+                    Assert.Equal(1, raised);
+                }
+            });
+        }
+
+        [Fact]
+        public void Start_with_windows_switch_toggles_the_registry_entry()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
             WithApp(provider, NewSettings(), (app, hotkey) =>
             {
-                Assert.False(FindItem(app, "Run Startup").Checked);
-                Click(app, "Run Startup");
-                Assert.True(FindItem(app, "Run Startup").Checked);
+                SettingsForm form = OpenSettings(app);
+                Assert.False(form.StartupToggle.Checked);
+                form.StartupToggle.Toggle();
+                Assert.True(form.StartupToggle.Checked);
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupKey))
                     Assert.Equal("\"" + Application.ExecutablePath + "\"", key.GetValue("Muter"));
-                Click(app, "Run Startup");
-                Assert.False(FindItem(app, "Run Startup").Checked);
+                form.StartupToggle.Toggle();
+                Assert.False(form.StartupToggle.Checked);
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(StartupKey))
+                    Assert.Null(key?.GetValue("Muter"));
             });
+        }
+
+        [Fact]
+        public void Settings_window_renders_every_page()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                SettingsForm form = OpenSettings(app);
+                Assert.StartsWith("1.", SettingsForm.VersionText());
+                foreach (string page in new[] { "General", "Overlay", "Mini indicator" })
+                {
+                    form.ShowPage(page);
+                    Assert.Equal(page, form.CurrentPage);
+                    using (var bitmap = new Bitmap(form.Width, form.Height))
+                        form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                }
+                Assert.Equal("F9", string.Join(" + ", form.HotkeyKeys.Keycaps));
+            });
+        }
+
+        private static bool ProcessDialogKey(Form form, Keys keyData)
+        {
+            System.Reflection.MethodInfo method = form.GetType().GetMethod("ProcessDialogKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            return (bool)method.Invoke(form, new object[] { keyData });
         }
 
         [Fact]

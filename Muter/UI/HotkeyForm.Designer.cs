@@ -42,7 +42,7 @@
             //
             // iconBox
             //
-            this.iconBox.Location = new System.Drawing.Point(16, 13);
+            this.iconBox.Location = new System.Drawing.Point(16, 11);
             this.iconBox.Name = "iconBox";
             this.iconBox.Size = new System.Drawing.Size(20, 20);
             this.iconBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;

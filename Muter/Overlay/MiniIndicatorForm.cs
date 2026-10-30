@@ -81,7 +81,7 @@ namespace Muter.Overlay
             Image image = presentation.ShowsMuted ? AppResources.ImageMuted
                 : presentation.Visual == StatusVisual.NoDevice ? AppResources.ImageNoDevice
                 : AppResources.ImageLive;
-            int pad = Px(3 * RenderScale);
+            int pad = Px(2 * RenderScale);
             DrawImageFit(g, image, new Rectangle(pad, pad, all.Width - 2 * pad, all.Height - strip - 2 * pad));
 
             if (MoveMode)

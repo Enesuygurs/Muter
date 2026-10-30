@@ -31,7 +31,7 @@ namespace Muter.Tests
             {
                 using (var app = CreateApp(out _, out Settings settings))
                 {
-                    TrayApplicationContextTestsAccess.Click(app, "Overlay", "Mini Indicator");
+                    app.SetMiniIndicatorEnabled(true);
                     IntPtr before = GetForegroundWindow();
                     app.ToggleMute();
                     app.WaitForAudio();
@@ -51,11 +51,11 @@ namespace Muter.Tests
                     Assert.NotEqual(app.OverlayWindow.Handle, GetForegroundWindow());
                     Assert.NotEqual(app.MiniIndicator.Handle, GetForegroundWindow());
 
-                    TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
+                    app.SetPositionsUnlocked(true);
                     foreach (Form form in new Form[] { app.OverlayWindow, app.MiniIndicator })
                         Assert.True((GetWindowLong(form.Handle, GWL_EXSTYLE) & WS_EX_TRANSPARENT) == 0, "draggable while unlocked");
 
-                    TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
+                    app.SetPositionsUnlocked(false);
                     foreach (Form form in new Form[] { app.OverlayWindow, app.MiniIndicator })
                         Assert.True((GetWindowLong(form.Handle, GWL_EXSTYLE) & WS_EX_TRANSPARENT) != 0, "click-through again");
                 }
@@ -72,7 +72,7 @@ namespace Muter.Tests
                 {
                     using (var app = CreateApp(out _, out Settings settings))
                     {
-                        TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
+                        app.SetPositionsUnlocked(true);
                         TestSetup.PumpUntil(() => false, 200);
                         Rectangle start, moved;
 
@@ -112,7 +112,7 @@ namespace Muter.Tests
                             Assert.True(attempt < 3,
                                 $"drag failed 3 times; last: saved={saved} moved by ({dx},{dy}). overlay {app.OverlayWindow.Handle} visible={app.OverlayWindow.Visible} " +
                                 $"exstyle=0x{GetWindowLong(app.OverlayWindow.Handle, GWL_EXSTYLE):X} under cursor: {underCursor}; foreground: {Describe(GetForegroundWindow())}");
-                            TrayApplicationContextTestsAccess.Click(app, "Overlay", "Reset Positions");
+                            app.ResetPositions();
                             TestSetup.PumpUntil(() => false, 300);
                         }
 
@@ -123,7 +123,7 @@ namespace Muter.Tests
                         Assert.NotEqual(app.OverlayWindow.Handle, GetForegroundWindow()); // dragging never activates it
 
                         // Locking again keeps the dragged position.
-                        TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
+                        app.SetPositionsUnlocked(false);
                         app.ToggleMute();
                         app.WaitForAudio();
                         Assert.Equal(moved.Location, app.OverlayWindow.Location);

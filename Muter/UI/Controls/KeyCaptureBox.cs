@@ -64,6 +64,10 @@ namespace Muter.UI.Controls
         [DefaultValue("Press a key combination")]
         public string Placeholder { get; set; } = "Press a key combination";
 
+        // Only the keycaps, right-aligned and without the frame (for showing the hotkey in other windows).
+        [DefaultValue(false)]
+        public bool Compact { get; set; }
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             Focus();
@@ -88,6 +92,16 @@ namespace Muter.UI.Controls
             g.SmoothingMode = SmoothingMode.AntiAlias;
             float scale = DeviceDpi / 96f;
 
+            var caps = new List<string>(keycaps);
+            if (state == KeyCaptureState.Pending)
+                caps.Add("…");
+            if (Compact)
+            {
+                if (caps.Count > 0)
+                    DrawKeycaps(g, caps, scale);
+                return;
+            }
+
             Color border = state == KeyCaptureState.Invalid ? Theme.ErrorBorder
                 : state == KeyCaptureState.Valid || state == KeyCaptureState.Pending || Focused ? Theme.Accent
                 : Theme.Border;
@@ -101,9 +115,6 @@ namespace Muter.UI.Controls
                 g.DrawPath(pen, path);
             }
 
-            var caps = new List<string>(keycaps);
-            if (state == KeyCaptureState.Pending)
-                caps.Add("…");
             if (caps.Count == 0)
             {
                 TextRenderer.DrawText(g, Placeholder, Font, ClientRectangle, Theme.TextSecondary,
@@ -116,10 +127,10 @@ namespace Muter.UI.Controls
         private void DrawKeycaps(Graphics g, List<string> caps, float scale)
         {
             const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-            float padding = 12 * scale;
-            float gap = 8 * scale;
-            float capHeight = Math.Min(Height - 20 * scale, Font.Height + 16 * scale);
+            float padding = (Compact ? 8 : 12) * scale;
+            float gap = (Compact ? 5 : 8) * scale;
             float depth = 3 * scale;
+            float capHeight = Compact ? Height - depth - 1 : Math.Min(Height - 20 * scale, Font.Height + 16 * scale);
             Size plusSize = TextRenderer.MeasureText(g, "+", Font, Size.Empty, flags);
 
             var widths = new List<float>();
@@ -133,9 +144,9 @@ namespace Muter.UI.Controls
             total += (caps.Count - 1) * (plusSize.Width + 2 * gap);
 
             // Shrink the caps if a long combination would not fit.
-            float available = Width - 24 * scale;
+            float available = Compact ? Width - 1 : Width - 24 * scale;
             float shrink = total > available ? available / total : 1f;
-            float x = (Width - total * shrink) / 2;
+            float x = Compact ? Width - 1 - total * shrink : (Width - total * shrink) / 2;
             float top = (Height - capHeight - depth) / 2;
 
             for (int i = 0; i < caps.Count; i++)

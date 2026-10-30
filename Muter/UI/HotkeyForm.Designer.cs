@@ -1,6 +1,6 @@
-﻿namespace Muter
+﻿namespace Muter.UI
 {
-    partial class hotkeyForm
+    partial class HotkeyForm
     {
         /// <summary>
         /// Required designer variable.
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(hotkeyForm));
             this.key = new System.Windows.Forms.TextBox();
             this.setButton = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
@@ -53,7 +52,6 @@
             this.key.Text = "SHIFT + F";
             this.key.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.key.Click += new System.EventHandler(this.key_Click);
-            this.key.KeyDown += new System.Windows.Forms.KeyEventHandler(this.key_KeyDown);
             // 
             // setButton
             // 
@@ -124,12 +122,11 @@
             this.Controls.Add(this.setButton);
             this.Controls.Add(this.key);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximumSize = new System.Drawing.Size(208, 120);
             this.MinimumSize = new System.Drawing.Size(208, 120);
-            this.Name = "hotkeyForm";
+            this.Name = "HotkeyForm";
             this.Text = "Hotkey";
-            this.Load += new System.EventHandler(this.hotkeyForm_Load);
+            this.Load += new System.EventHandler(this.HotkeyForm_Load);
             this.topPanel.ResumeLayout(false);
             this.topPanel.PerformLayout();
             this.ResumeLayout(false);

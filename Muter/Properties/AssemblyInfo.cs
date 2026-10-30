@@ -17,7 +17,7 @@ using System.Runtime.InteropServices;
 [assembly: Guid("a96241f9-3d3e-484a-b3b5-1e57202b1b6d")]
 
 // Bumping the version moves user.config to a new folder; Program migrates the old values with Settings.Upgrade().
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 [assembly: InternalsVisibleTo("Muter.Tests")]

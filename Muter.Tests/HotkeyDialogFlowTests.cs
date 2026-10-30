@@ -286,7 +286,7 @@ namespace Muter.Tests
                 settings.Reset();
                 settings.hotkeyKey = (int)Keys.F9;
 
-                using (var app = new TrayApplicationContext(settings, () => provider, hotkey, new StartupRegistration(Application.ExecutablePath, @"Software\MuterTests\HotkeyRun")))
+                using (var app = new TrayApplicationContext(settings, () => provider, hotkey, new StartupRegistration(Application.ExecutablePath, @"Software\MuterTests\HotkeyRun"), TestSetup.Silent))
                 {
                     Assert.True(hotkey.IsRegistered);
 
@@ -310,6 +310,7 @@ namespace Muter.Tests
                     });
                     closer.Start();
                     SettingsForm settingsWindow = app.OpenSettings();
+                    settingsWindow.ShowPage("Hotkey");
                     settingsWindow.ChangeHotkeyButton.PerformClick(); // runs the dialog modally
                     closer.Join(10000);
                     Assert.Null(closerFailure);

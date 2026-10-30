@@ -82,6 +82,9 @@ namespace Muter.Audio
         // Every call is one toggle; presses are never merged.
         public void Toggle() => Enqueue(() => Report(Controller()?.ToggleMute(), StatusSource.MuteAction));
 
+        // Push to talk. Every call is carried out, in order: a quick press and release always ends muted.
+        public void SetMuted(bool mute, StatusSource source) => Enqueue(() => Report(Controller()?.SetMute(mute), source));
+
         public void SetTarget(string deviceId) => Enqueue(() =>
         {
             targetDeviceId = deviceId;

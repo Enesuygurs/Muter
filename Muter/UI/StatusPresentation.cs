@@ -57,10 +57,31 @@ namespace Muter.UI
             }
         }
 
+        // Shown while an audio call is stuck: the last known state may no longer be true.
+        public static StatusPresentation NotResponding(bool allDevicesMode)
+        {
+            return new StatusPresentation(allDevicesMode ? "All Devices" : "Microphone", "UNKNOWN", StatusVisual.Unknown,
+                FormatTooltip("audio system not responding, assume ON"));
+        }
+
         private static string FormatTooltip(string text)
         {
             string tooltip = "Muter - " + text;
             return tooltip.Length <= MaxTooltipLength ? tooltip : tooltip.Substring(0, MaxTooltipLength - 3) + "...";
+        }
+    }
+
+    internal static class StatusVisualExtensions
+    {
+        public static MicState ToState(this StatusVisual visual)
+        {
+            switch (visual)
+            {
+                case StatusVisual.Live: return MicState.Live;
+                case StatusVisual.Muted: return MicState.Muted;
+                case StatusVisual.NoDevice: return MicState.NoDevice;
+                default: return MicState.Unknown;
+            }
         }
     }
 }

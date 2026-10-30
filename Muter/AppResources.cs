@@ -12,7 +12,14 @@ namespace Muter
         private static readonly Lazy<Icon> trayLive = new Lazy<Icon>(() => LoadIcon("muteron.ico", SystemInformation.SmallIconSize));
         private static readonly Lazy<Icon> trayMuted = new Lazy<Icon>(() => LoadIcon("muteroff.ico", SystemInformation.SmallIconSize));
         private static readonly Lazy<Icon> trayNoDevice = new Lazy<Icon>(() => LoadIcon("nodevice.ico", SystemInformation.SmallIconSize));
-        private static readonly Lazy<Bitmap> imageLive = new Lazy<Bitmap>(() => LoadBitmap("muteron.png"));
+        private static readonly Lazy<System.Collections.Generic.Dictionary<Icon, Icon>> alternates = new Lazy<System.Collections.Generic.Dictionary<Icon, Icon>>(() =>
+            new System.Collections.Generic.Dictionary<Icon, Icon>
+            {
+                [TrayLive] = (Icon)TrayLive.Clone(),
+                [TrayMuted] = (Icon)TrayMuted.Clone(),
+                [TrayNoDevice] = (Icon)TrayNoDevice.Clone(),
+            });
+        private static readonly Lazy<Bitmap> imageLive =new Lazy<Bitmap>(() => LoadBitmap("muteron.png"));
         private static readonly Lazy<Bitmap> imageMuted = new Lazy<Bitmap>(() => LoadBitmap("muteroff.png"));
         private static readonly Lazy<Bitmap> imageNoDevice = new Lazy<Bitmap>(() => LoadBitmap("nodevice.png"));
 
@@ -23,6 +30,16 @@ namespace Muter
         public static Icon TrayMuted => trayMuted.Value;
 
         public static Icon TrayNoDevice => trayNoDevice.Value;
+
+        // Tray icon for a state. The alternate instance has the same image; switching to it forces the tray icon to be
+        // sent to Explorer again (NotifyIcon skips updates when the icon object is unchanged).
+        public static Icon TrayIcon(UI.StatusVisual visual, bool alternate)
+        {
+            Icon icon = visual == UI.StatusVisual.Muted ? TrayMuted
+                : visual == UI.StatusVisual.NoDevice ? TrayNoDevice
+                : TrayLive;
+            return alternate ? alternates.Value[icon] : icon;
+        }
 
         public static Bitmap ImageLive => imageLive.Value;
 

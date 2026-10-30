@@ -36,19 +36,9 @@ namespace Muter
                 Log.Info($"Muter {Application.ProductVersion} starting ({(Environment.Is64BitProcess ? "64" : "32")}-bit, Windows {Environment.OSVersion.Version})");
                 MigrateSettings(Settings.Default);
 
-                CoreAudioEndpointProvider provider;
-                try
-                {
-                    provider = new CoreAudioEndpointProvider();
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("The Windows audio system could not be opened", ex);
-                    MessageBox.Show("Muter could not access the Windows audio system:\n" + ex.Message, "Muter", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                using (var context = new TrayApplicationContext(Settings.Default, provider, new GlobalHotkey(), new StartupRegistration(Application.ExecutablePath)))
+                // The audio provider is created on the audio thread; if Windows audio is unavailable the app shows the
+                // state as unknown and keeps retrying.
+                using (var context = new TrayApplicationContext(Settings.Default, () => new CoreAudioEndpointProvider(), new GlobalHotkey(), new StartupRegistration(Application.ExecutablePath)))
                     Application.Run(context);
 
                 Log.Info("Muter stopped");

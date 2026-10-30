@@ -205,9 +205,7 @@ namespace Muter.UI.Controls
             {
                 var cell = new RectangleF(track.Left + pad + i * width, track.Top, width, track.Height);
                 bool selected = i == selectedIndex;
-                // The text is only on the green thumb once it has (nearly) arrived there.
-                bool onThumb = selected && Math.Abs(thumbPosition - i) < 0.5f;
-                Color text = !Enabled ? Theme.TextDisabled : onThumb ? Theme.AccentText : selected || i == hoverIndex ? Theme.TextPrimary : Theme.TextSecondary;
+                Color text = !Enabled ? Theme.TextDisabled : selected || i == hoverIndex ? Theme.TextPrimary : Theme.TextSecondary;
                 TextRenderer.DrawText(g, segments[i], Font, Rectangle.Round(cell), text,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
             }

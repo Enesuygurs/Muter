@@ -36,8 +36,9 @@ namespace Muter.UI.Controls
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle image = e.ImageRectangle;
-            var box = new Rectangle(image.X, (e.Item.Height - image.Height) / 2, image.Width, image.Height); // centred like the text
-            float s = box.Height / 16f;
+            float s = image.Height / 16f;
+            // Centred like the text, and moved right a little: at the margin's left edge it looks cut off from the text.
+            var box = new Rectangle(image.X + (int)(5 * s), (e.Item.Height - image.Height) / 2, image.Width, image.Height);
             using (var pen = new Pen(Theme.Accent, 2f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
             {
                 g.DrawLines(pen, new[]

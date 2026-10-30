@@ -176,7 +176,8 @@ namespace Muter.UI
 
         private void BuildTitleBar()
         {
-            var icon = new PictureBox { Location = new Point(16, 13), Size = new Size(20, 20), SizeMode = PictureBoxSizeMode.Zoom };
+            // Centred on the capital letters of the title, not on its whole line (which includes room for descenders).
+            var icon = new PictureBox { Location = new Point(16, 11), Size = new Size(20, 20), SizeMode = PictureBoxSizeMode.Zoom };
             using (var small = new Icon(AppResources.AppIcon, 32, 32))
                 icon.Image = small.ToBitmap();
             FormClosed += (s, e) => icon.Image?.Dispose();

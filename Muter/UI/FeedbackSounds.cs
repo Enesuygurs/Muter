@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Media;
 
 namespace Muter.UI
 {
@@ -12,34 +11,27 @@ namespace Muter.UI
         Warning, // low double buzz: the state could not be verified (treat it as on)
     }
 
-    // Short tones played after a mute or unmute. They are generated here (no sound files) and played asynchronously.
+    // Short tones played after a mute or unmute. They are generated here (no sound files) and played by SoundOutput.
     internal static class FeedbackSounds
     {
-        private const int SampleRate = 44100;
-        private static readonly Dictionary<FeedbackSound, SoundPlayer> players = new Dictionary<FeedbackSound, SoundPlayer>();
+        private const int WaveSampleRate = 44100;
+        private static readonly Lazy<SoundOutput> output = new Lazy<SoundOutput>(() => new SoundOutput());
 
-        public static void Play(FeedbackSound sound)
+        public static void Play(FeedbackSound sound) => output.Value.Play(sound);
+
+        // Gets the output ready ahead of time, so even the first sound is not late.
+        public static void Prepare() => output.Value.Prepare();
+
+        public static void Release()
         {
-            try
-            {
-                if (!players.TryGetValue(sound, out SoundPlayer player))
-                {
-                    player = new SoundPlayer(new MemoryStream(Wave(sound)));
-                    player.Load();
-                    players[sound] = player;
-                }
-                player.Play();
-            }
-            catch (Exception ex)
-            {
-                Log.Warn("Could not play the feedback sound", ex);
-            }
+            if (output.IsValueCreated)
+                output.Value.Release();
         }
 
-        // 16-bit mono PCM WAV file.
+        // 16-bit mono PCM WAV file (the PlaySound fallback).
         internal static byte[] Wave(FeedbackSound sound)
         {
-            short[] samples = Samples(sound);
+            float[] samples = Samples(sound, WaveSampleRate);
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
             {
@@ -49,36 +41,37 @@ namespace Muter.UI
                 writer.Write(16);
                 writer.Write((short)1); // PCM
                 writer.Write((short)1); // mono
-                writer.Write(SampleRate);
-                writer.Write(SampleRate * 2);
+                writer.Write(WaveSampleRate);
+                writer.Write(WaveSampleRate * 2);
                 writer.Write((short)2);
                 writer.Write((short)16);
                 writer.Write(new[] { 'd', 'a', 't', 'a' });
                 writer.Write(samples.Length * 2);
-                foreach (short sample in samples)
-                    writer.Write(sample);
+                foreach (float sample in samples)
+                    writer.Write((short)(sample * short.MaxValue));
                 return stream.ToArray();
             }
         }
 
-        private static short[] Samples(FeedbackSound sound)
+        // Mono samples (-1..1) at the given rate.
+        internal static float[] Samples(FeedbackSound sound, int sampleRate)
         {
             switch (sound)
             {
-                case FeedbackSound.Live: return Notes((660, 70), (0, 15), (990, 90));
-                case FeedbackSound.Muted: return Notes((990, 70), (0, 15), (587, 110));
-                default: return Notes((330, 110), (0, 60), (330, 110));
+                case FeedbackSound.Live: return Notes(sampleRate, (660, 70), (0, 15), (990, 90));
+                case FeedbackSound.Muted: return Notes(sampleRate, (990, 70), (0, 15), (587, 110));
+                default: return Notes(sampleRate, (330, 110), (0, 60), (330, 110));
             }
         }
 
         // Each note: frequency (0 = silence) and length in milliseconds.
-        private static short[] Notes(params (double Frequency, int Ms)[] notes)
+        private static float[] Notes(int sampleRate, params (double Frequency, int Ms)[] notes)
         {
-            var samples = new List<short>();
+            var samples = new List<float>();
+            int attack = sampleRate * 4 / 1000;
             foreach (var note in notes)
             {
-                int count = SampleRate * note.Ms / 1000;
-                int attack = SampleRate * 4 / 1000;
+                int count = sampleRate * note.Ms / 1000;
                 for (int i = 0; i < count; i++)
                 {
                     if (note.Frequency <= 0)
@@ -86,11 +79,11 @@ namespace Muter.UI
                         samples.Add(0);
                         continue;
                     }
-                    double t = (double)i / SampleRate;
+                    double t = (double)i / sampleRate;
                     // Soft start, exponential fade: a short "blip" without clicks.
                     double envelope = Math.Min(1.0, (double)i / attack) * Math.Exp(-3.5 * i / count) * Math.Min(1.0, (count - i) / (double)attack);
                     double wave = Math.Sin(2 * Math.PI * note.Frequency * t) + 0.25 * Math.Sin(4 * Math.PI * note.Frequency * t);
-                    samples.Add((short)(wave / 1.25 * envelope * 0.30 * short.MaxValue));
+                    samples.Add((float)(wave / 1.25 * envelope * 0.30));
                 }
             }
             return samples.ToArray();

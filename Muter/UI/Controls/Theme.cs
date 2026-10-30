@@ -32,7 +32,7 @@ namespace Muter.UI.Controls
         public static readonly Color KeycapBorder = Color.FromArgb(84, 84, 84);
         public static readonly Color KeycapShadow = Color.FromArgb(22, 22, 22);
 
-        public const string FontFamily = "Segoe UI";
+        public const string SemiboldFontFamily = "Segoe UI Semibold";
         public const string IconFontFamily = "Segoe MDL2 Assets";
 
         public static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)

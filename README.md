@@ -61,6 +61,15 @@ dotnet test Muter.sln
 
 Note: the tests in `Muter.Tests/Hardware` mute and unmute the real microphones of the computer they run on (the original states are restored afterwards), and some UI tests briefly show windows and move the mouse.
 
+Every pull request and every push to `master` is built and tested on GitHub (the hardware tests are skipped there, as the build machine has no microphones).
+
+### Releasing
+
+1.  Raise the version in `Muter/Properties/AssemblyInfo.cs` (`AssemblyVersion` and `AssemblyFileVersion`, e.g. `1.3.0.0`) and merge it.
+2.  Tag that commit and push the tag: `git tag v1.3` then `git push origin v1.3`.
+
+The Release workflow checks that the tag matches the version, builds and tests the app, and publishes `Muter.v1.3.zip` as a GitHub release with notes generated from the merged pull requests.
+
 ## Built With
 
 This project was built using:

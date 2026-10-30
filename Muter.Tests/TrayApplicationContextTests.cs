@@ -1,12 +1,12 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Muter.Audio;
 using Muter.Hotkeys;
-using Muter.Overlay;
 using Muter.Properties;
 using Muter.Tests.Fakes;
 using Muter.UI;
@@ -14,10 +14,13 @@ using Xunit;
 
 namespace Muter.Tests
 {
-    // The whole application wired together (real forms, tray icon and menu) with a fake audio system and hotkey.
+    // The whole application wired together (real forms, tray icon, menu and audio thread) with a fake audio system and
+    // a fake hotkey.
     public sealed class TrayApplicationContextTests : IDisposable
     {
         private const string StartupKey = @"Software\MuterTests\TrayRun";
+        private const int WM_CLOSE = 0x0010;
+        private const int WM_QUERYENDSESSION = 0x0011;
 
         public TrayApplicationContextTests() => TestSetup.Init();
 
@@ -33,16 +36,22 @@ namespace Muter.Tests
             return settings;
         }
 
+        private static TrayApplicationContext Start(FakeAudioEndpointProvider provider, Settings settings, FakeGlobalHotkey hotkey)
+        {
+            var app = new TrayApplicationContext(settings, () => provider, hotkey, new StartupRegistration(Application.ExecutablePath, StartupKey));
+            Assert.True(app.WaitForAudio());
+            return app;
+        }
+
         private static void WithApp(FakeAudioEndpointProvider provider, Settings settings, Action<TrayApplicationContext, FakeGlobalHotkey> test, FakeGlobalHotkey hotkey = null)
         {
             TestSetup.RunSta(() =>
             {
                 hotkey = hotkey ?? new FakeGlobalHotkey();
-                var startup = new StartupRegistration(Application.ExecutablePath, StartupKey);
-                using (var app = new TrayApplicationContext(settings, provider, hotkey, startup))
+                using (TrayApplicationContext app = Start(provider, settings, hotkey))
                     test(app, hotkey);
-                Assert.True(provider.Disposed);
-                Assert.True(hotkey.Disposed);
+                Assert.True(provider.Disposed, "audio devices released on exit");
+                Assert.True(hotkey.Disposed, "hotkey released on exit");
             });
         }
 
@@ -60,7 +69,17 @@ namespace Muter.Tests
             return found;
         }
 
-        private static void Click(TrayApplicationContext app, params string[] path) => FindItem(app, path).PerformClick();
+        private static void Click(TrayApplicationContext app, params string[] path)
+        {
+            FindItem(app, path).PerformClick();
+            app.WaitForAudio();
+        }
+
+        private static void Press(TrayApplicationContext app, FakeGlobalHotkey hotkey)
+        {
+            hotkey.Press();
+            Assert.True(app.WaitForAudio());
+        }
 
         private static FakeAudioEndpointProvider OneLiveMic()
         {
@@ -78,23 +97,38 @@ namespace Muter.Tests
             {
                 Assert.True(hotkey.IsRegistered);
                 Assert.Equal(new Hotkey(Keys.F9, HotkeyModifiers.None), hotkey.Current);
-                Assert.Same(AppResources.TrayLive, app.TrayIcon.Icon);
+                Assert.Equal(StatusVisual.Live, VisualOf(app.TrayIcon.Icon));
                 Assert.Equal("Muter - Headset: ON", app.TrayIcon.Text);
                 Assert.True(app.OverlayWindow.Visible);
                 Assert.True(app.MiniIndicator.Visible);
 
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.True(provider.Get("a").Muted);
-                Assert.Same(AppResources.TrayMuted, app.TrayIcon.Icon);
+                Assert.Equal(StatusVisual.Muted, VisualOf(app.TrayIcon.Icon));
                 Assert.Equal("Muter - Headset: OFF", app.TrayIcon.Text);
                 Assert.True(app.OverlayWindow.Presentation.ShowsMuted);
                 Assert.True(app.MiniIndicator.Presentation.ShowsMuted);
                 Assert.True(app.OverlayWindow.Visible);
 
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.False(provider.Get("a").Muted);
-                Assert.Same(AppResources.TrayLive, app.TrayIcon.Icon);
+                Assert.Equal(StatusVisual.Live, VisualOf(app.TrayIcon.Icon));
                 Assert.False(app.OverlayWindow.Presentation.ShowsMuted);
+            });
+        }
+
+        [Fact]
+        public void Every_press_is_one_toggle_even_in_a_fast_burst()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                for (int i = 0; i < 7; i++)
+                    hotkey.Press();
+                Assert.True(app.WaitForAudio());
+                Assert.True(provider.Get("a").Muted); // odd number of presses
+                Assert.Equal(MicState.Muted, app.Status.State);
+                Assert.Equal(7, provider.Get("a").Writes);
             });
         }
 
@@ -104,15 +138,15 @@ namespace Muter.Tests
             FakeAudioEndpointProvider provider = OneLiveMic();
             WithApp(provider, NewSettings(), (app, hotkey) =>
             {
-                hotkey.Press();
-                Assert.Same(AppResources.TrayMuted, app.TrayIcon.Icon);
+                Press(app, hotkey);
+                Assert.Equal(StatusVisual.Muted, VisualOf(app.TrayIcon.Icon));
 
                 provider.Get("a").Muted = false; // unmuted by another application
                 var thread = new Thread(provider.RaiseMuteStateChanged);
                 thread.Start();
                 thread.Join();
-                Assert.True(TestSetup.PumpUntil(() => app.TrayIcon.Icon == AppResources.TrayLive, 500));
-                Assert.Equal(MicState.Live, app.Controller.Status.State);
+                Assert.True(TestSetup.PumpUntil(() => VisualOf(app.TrayIcon.Icon) == StatusVisual.Live, 500));
+                Assert.Equal(MicState.Live, app.Status.State);
             });
         }
 
@@ -122,10 +156,10 @@ namespace Muter.Tests
             FakeAudioEndpointProvider provider = OneLiveMic();
             WithApp(provider, NewSettings(), (app, hotkey) =>
             {
-                hotkey.Press();
+                Press(app, hotkey);
                 provider.Get("a").Muted = false; // no notification at all
-                Assert.True(TestSetup.PumpUntil(() => app.Controller.Status.State == MicState.Live, TrayApplicationContext.PollIntervalMs * 2 + 500));
-                Assert.Same(AppResources.TrayLive, app.TrayIcon.Icon);
+                Assert.True(TestSetup.PumpUntil(() => app.Status.State == MicState.Live, TrayApplicationContext.PollIntervalMs * 2 + 500));
+                Assert.Equal(StatusVisual.Live, VisualOf(app.TrayIcon.Icon));
             });
         }
 
@@ -137,9 +171,59 @@ namespace Muter.Tests
             {
                 provider.Get("a").Active = false;
                 new Thread(provider.RaiseDevicesChanged).Start();
-                Assert.True(TestSetup.PumpUntil(() => app.Controller.Status.State == MicState.NoDevice, 900));
-                Assert.Same(AppResources.TrayNoDevice, app.TrayIcon.Icon);
+                Assert.True(TestSetup.PumpUntil(() => app.Status.State == MicState.NoDevice, 900));
+                Assert.Equal(StatusVisual.NoDevice, VisualOf(app.TrayIcon.Icon));
                 Assert.Equal("Muter - No Device", app.TrayIcon.Text);
+            });
+        }
+
+        [Fact]
+        public void Hung_audio_call_shows_unknown_instead_of_the_last_state()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                Press(app, hotkey);
+                Assert.Equal(StatusVisual.Muted, VisualOf(app.TrayIcon.Icon));
+
+                using (var gate = new ManualResetEventSlim(false))
+                {
+                    provider.BlockReads = gate;   // the driver hangs...
+                    provider.Get("a").Muted = false; // ...while the microphone becomes live
+                    hotkey.Press();
+
+                    Assert.True(TestSetup.PumpUntil(() => app.AudioNotResponding, TrayApplicationContext.NotRespondingMs + 2500));
+                    Assert.Equal(StatusVisual.Live, VisualOf(app.TrayIcon.Icon)); // never the muted icon
+                    Assert.Equal("Muter - audio system not responding, assume ON", app.TrayIcon.Text);
+                    Assert.Equal(StatusVisual.Unknown, app.OverlayWindow.Presentation.Visual);
+                    Assert.False(app.OverlayWindow.Presentation.ShowsMuted);
+                    Assert.False(app.MiniIndicator.Presentation.ShowsMuted);
+                    Assert.True(app.OverlayWindow.Visible);
+
+                    // The UI thread stays responsive meanwhile.
+                    Assert.True(FindItem(app, "Overlay").DropDownItems.Count > 0);
+
+                    provider.BlockReads = null;
+                    gate.Set();
+                }
+                Assert.True(app.WaitForAudio());
+                Assert.False(app.AudioNotResponding);
+                Assert.NotEqual(MicState.Unknown, app.Status.State);
+                Assert.Equal(app.Status.State == MicState.Muted, provider.Get("a").Muted);
+            });
+        }
+
+        [Fact]
+        public void A_tampered_tray_icon_is_corrected_by_the_next_poll()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                Press(app, hotkey);
+                app.TrayIcon.Text = "stale";
+                app.TrayIcon.Icon = AppResources.TrayLive; // e.g. an update Explorer never applied
+                Assert.True(TestSetup.PumpUntil(() => app.TrayIcon.Text == "Muter - Headset: OFF" && VisualOf(app.TrayIcon.Icon) == StatusVisual.Muted,
+                    TrayApplicationContext.PollIntervalMs * 2 + 500));
             });
         }
 
@@ -154,15 +238,16 @@ namespace Muter.Tests
                 Assert.True(FindItem(app, "Devices", "Default (System)").Checked);
 
                 Click(app, "Devices", "All Devices");
-                Assert.True(app.Controller.IsAllDevicesMode);
+                Assert.True(app.IsAllDevicesMode);
                 Assert.Equal(MicrophoneController.AllDevicesId, settings.selectedDeviceId);
                 Assert.True(FindItem(app, "Devices", "All Devices").Checked);
                 Assert.Equal("All Devices", app.OverlayWindow.Presentation.Title);
+                Assert.Equal(2, app.Status.DeviceCount);
 
                 Click(app, "Devices", "Array");
                 Assert.Equal("b", settings.selectedDeviceId);
                 Assert.Equal("Array", settings.selectedDeviceName);
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.True(provider.Get("b").Muted);
                 Assert.False(provider.Get("a").Muted);
 
@@ -172,20 +257,53 @@ namespace Muter.Tests
         }
 
         [Fact]
+        public void Devices_menu_does_not_hang_when_the_audio_system_hangs()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            WithApp(provider, NewSettings(), (app, hotkey) =>
+            {
+                using (var gate = new ManualResetEventSlim(false))
+                {
+                    provider.BlockReads = gate;
+                    app.RefreshNow(); // the audio thread gets stuck in a read
+                    Thread.Sleep(100);
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    Assert.NotNull(FindItem(app, "Devices", "(Failed to list devices)"));
+                    Assert.True(watch.ElapsedMilliseconds < 2500, "menu opened in " + watch.ElapsedMilliseconds + " ms");
+                    provider.BlockReads = null;
+                    gate.Set();
+                }
+            });
+        }
+
+        [Fact]
         public void Sync_menu_item_toggles_on_and_off()
         {
             FakeAudioEndpointProvider provider = OneLiveMic();
-            Settings settings = NewSettings(s => s.selectedDeviceId = MicrophoneController.AllDevicesId);
+            provider.Add("b", muted: true);
+            Settings settings = NewSettings(s =>
+            {
+                s.selectedDeviceId = MicrophoneController.AllDevicesId;
+                s.syncDevices = false;
+            });
             WithApp(provider, settings, (app, hotkey) =>
             {
-                Assert.True(FindItem(app, "Sync Devices").Checked);
-                Click(app, "Sync Devices");
-                Assert.False(settings.syncDevices);
-                Assert.False(app.Controller.SyncDevices);
                 Assert.False(FindItem(app, "Sync Devices").Checked);
+                Assert.Equal(MicState.Live, app.Status.State); // mixed, not synced
+
                 Click(app, "Sync Devices");
                 Assert.True(settings.syncDevices);
-                Assert.True(app.Controller.SyncDevices);
+                Assert.True(FindItem(app, "Sync Devices").Checked);
+                Assert.True(provider.Devices.All(d => d.Muted)); // aligned (no history: muted)
+                Assert.Equal(MicState.Muted, app.Status.State);
+
+                Click(app, "Sync Devices");
+                Assert.False(settings.syncDevices);
+                provider.Get("a").Muted = false;
+                app.RefreshNow();
+                app.WaitForAudio();
+                Assert.True(provider.Get("b").Muted); // no longer synced
+                Assert.Equal(MicState.Live, app.Status.State);
             });
         }
 
@@ -200,9 +318,9 @@ namespace Muter.Tests
                 Assert.False(settings.showGui);
                 Assert.False(app.OverlayWindow.Visible);
 
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.False(app.OverlayWindow.Visible);
-                Assert.Same(AppResources.TrayMuted, app.TrayIcon.Icon);
+                Assert.Equal(StatusVisual.Muted, VisualOf(app.TrayIcon.Icon));
             });
         }
 
@@ -215,13 +333,13 @@ namespace Muter.Tests
             {
                 Click(app, "Overlay", "Display Time", "0.5 s");
                 Assert.Equal(500, settings.overlayDurationMs);
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.True(app.OverlayWindow.Visible);
                 Assert.True(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 2000));
 
                 Click(app, "Overlay", "Display Time", "Always Visible");
                 Assert.True(app.OverlayWindow.Visible);
-                hotkey.Press();
+                Press(app, hotkey);
                 Assert.False(TestSetup.PumpUntil(() => !app.OverlayWindow.Visible, 1500));
                 Assert.Equal(1.0, app.OverlayWindow.Opacity, 3);
             });
@@ -324,10 +442,35 @@ namespace Muter.Tests
             WithApp(provider, NewSettings(), (app, h) =>
             {
                 Assert.False(h.IsRegistered);
-                Assert.Equal(MicState.Live, app.Controller.Status.State);
+                Assert.Equal(MicState.Live, app.Status.State);
                 app.ToggleMute(); // tray click still works
+                app.WaitForAudio();
                 Assert.True(provider.Get("a").Muted);
             }, hotkey);
+        }
+
+        [Fact]
+        public void Audio_system_unavailable_at_start_shows_unknown_and_recovers()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            int attempts = 0;
+            TestSetup.RunSta(() =>
+            {
+                Func<IAudioEndpointProvider> factory = () =>
+                {
+                    if (++attempts < 3)
+                        throw new COMException("audio service not running");
+                    return provider;
+                };
+                using (var app = new TrayApplicationContext(NewSettings(), factory, new FakeGlobalHotkey(), new StartupRegistration(Application.ExecutablePath, StartupKey)))
+                {
+                    app.WaitForAudio();
+                    Assert.Equal(MicState.Unknown, app.Status.State);
+                    Assert.Equal(StatusVisual.Live, VisualOf(app.TrayIcon.Icon));
+                    Assert.Equal("Muter - state unknown, assume ON", app.TrayIcon.Text);
+                    Assert.True(TestSetup.PumpUntil(() => app.Status.State == MicState.Live, TrayApplicationContext.PollIntervalMs * 3 + 500));
+                }
+            });
         }
 
         [Fact]
@@ -337,11 +480,68 @@ namespace Muter.Tests
             var hotkey = new FakeGlobalHotkey();
             TestSetup.RunSta(() =>
             {
-                var app = new TrayApplicationContext(NewSettings(), provider, hotkey, new StartupRegistration(Application.ExecutablePath, StartupKey));
-                app.OverlayWindow.Close(); // what taskkill or Windows sign-out sends
-                Assert.True(TestSetup.PumpUntil(() => provider.Disposed, 1000));
+                TrayApplicationContext app = Start(provider, NewSettings(), hotkey);
+                app.OverlayWindow.Close();
+                Assert.True(TestSetup.PumpUntil(() => provider.Disposed, 3000));
                 Assert.True(hotkey.Disposed);
                 Assert.False(app.TrayIcon.Visible);
+            });
+        }
+
+        [Fact]
+        public void Posted_close_messages_like_taskkill_exit_cleanly_but_other_windows_close_normally()
+        {
+            foreach (bool viaCloseWindow in new[] { true, false })
+            {
+                FakeAudioEndpointProvider provider = OneLiveMic();
+                var hotkey = new FakeGlobalHotkey();
+                TestSetup.RunSta(() =>
+                {
+                    TrayApplicationContext app = Start(provider, NewSettings(s => s.showGui = false), hotkey);
+
+                    // An ordinary form closes as usual and does not end the app.
+                    var form = new Form();
+                    PostMessage(form.Handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                    TestSetup.PumpUntil(() => false, 300);
+                    Assert.True(form.IsDisposed);
+                    Assert.False(provider.Disposed);
+
+                    // A window no longer registered with WinForms (a collected NativeWindow cleaning itself up) is
+                    // destroyed as intended and does not end the app.
+                    var orphan = new NativeWindow();
+                    orphan.CreateHandle(new CreateParams());
+                    IntPtr orphanHandle = orphan.Handle;
+                    orphan.ReleaseHandle();
+                    PostMessage(orphanHandle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                    TestSetup.PumpUntil(() => false, 300);
+                    Assert.False(IsWindow(orphanHandle));
+                    Assert.False(provider.Disposed);
+
+                    // taskkill: to our close window, or to any live helper window of ours (like the tray icon's,
+                    // which must survive until the icon is removed): clean exit.
+                    var helper = new NativeWindow();
+                    helper.CreateHandle(new CreateParams());
+                    PostMessage(viaCloseWindow ? app.CloseRequestWindow : helper.Handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                    Assert.True(TestSetup.PumpUntil(() => provider.Disposed, 3000));
+                    Assert.True(hotkey.Disposed);
+                    Assert.False(app.TrayIcon.Visible);
+                    Assert.True(IsWindow(helper.Handle));
+                    helper.DestroyHandle();
+                });
+            }
+        }
+
+        [Fact]
+        public void Never_blocks_windows_sign_out_or_shutdown()
+        {
+            FakeAudioEndpointProvider provider = OneLiveMic();
+            var hotkey = new FakeGlobalHotkey();
+            TestSetup.RunSta(() =>
+            {
+                TrayApplicationContext app = Start(provider, NewSettings(), hotkey);
+                foreach (Form window in new Form[] { app.OverlayWindow, app.MiniIndicator })
+                    Assert.NotEqual(IntPtr.Zero, SendMessage(window.Handle, WM_QUERYENDSESSION, IntPtr.Zero, IntPtr.Zero));
+                Assert.True(TestSetup.PumpUntil(() => provider.Disposed, 3000));
             });
         }
 
@@ -352,8 +552,8 @@ namespace Muter.Tests
             var hotkey = new FakeGlobalHotkey();
             TestSetup.RunSta(() =>
             {
-                var app = new TrayApplicationContext(NewSettings(), provider, hotkey, new StartupRegistration(Application.ExecutablePath, StartupKey));
-                Click(app, "Exit");
+                TrayApplicationContext app = Start(provider, NewSettings(), hotkey);
+                FindItem(app, "Exit").PerformClick();
                 Assert.True(provider.Disposed);
                 Assert.True(hotkey.Disposed);
                 Assert.False(app.TrayIcon.Visible);
@@ -363,5 +563,24 @@ namespace Muter.Tests
                 Application.DoEvents();
             });
         }
+
+        private static StatusVisual VisualOf(Icon icon)
+        {
+            foreach (StatusVisual visual in new[] { StatusVisual.Live, StatusVisual.Muted, StatusVisual.NoDevice })
+            {
+                if (icon == AppResources.TrayIcon(visual, false) || icon == AppResources.TrayIcon(visual, true))
+                    return visual; // Unknown deliberately uses the live icon, so it reports Live here
+            }
+            throw new InvalidOperationException("Unexpected tray icon");
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
     }
 }

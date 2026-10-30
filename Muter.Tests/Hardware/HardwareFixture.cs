@@ -61,6 +61,18 @@ namespace Muter.Tests.Hardware
                 device.AudioEndpointVolume.Mute = mute;
         }
 
+        public float ReadVolume(string id)
+        {
+            using (MMDevice device = enumerator.GetDevice(id))
+                return device.AudioEndpointVolume.MasterVolumeLevelScalar;
+        }
+
+        public void WriteVolume(string id, float level)
+        {
+            using (MMDevice device = enumerator.GetDevice(id))
+                device.AudioEndpointVolume.MasterVolumeLevelScalar = level;
+        }
+
         public void SetAll(bool mute)
         {
             foreach (string id in DeviceIds())

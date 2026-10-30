@@ -94,8 +94,25 @@ namespace Muter.UI.Controls
                 item.Click += (s, e) => Choose(chosen.Value);
                 menu.Items.Add(item);
             }
-            menu.MinimumSize = new Size(Width, 0);
-            menu.Show(this, new Point(0, Height));
+            // The list is exactly as wide as the button and every item spans it (a minimum size alone would leave an
+            // empty strip on the right that the highlight does not reach). Rows are a bit taller than the default.
+            float scale = DeviceDpi / 96f;
+            int vertical = (int)(4 * scale);
+            menu.AutoSize = true;
+            foreach (ToolStripItem item in menu.Items)
+                item.Padding = new Padding(0, vertical, 0, vertical);
+            menu.PerformLayout();
+            Size natural = menu.GetPreferredSize(Size.Empty);
+            int extra = Width - natural.Width;
+            if (extra > 0)
+            {
+                // WinForms does not grow the list for item padding, so the list width is set explicitly.
+                foreach (ToolStripItem item in menu.Items)
+                    item.Padding = new Padding(0, vertical, extra, vertical);
+                menu.AutoSize = false;
+                menu.Size = new Size(Width, natural.Height);
+            }
+            menu.Show(this, new Point(0, Height + (int)(2 * scale)));
         }
 
         protected override void OnClick(EventArgs e)

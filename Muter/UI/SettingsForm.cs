@@ -300,6 +300,11 @@ namespace Muter.UI
             AddRow(page, "Keep in sync", "Controlled microphones always share the same state", SyncToggle, ref y);
 
             y += 6;
+            AddSection(page, "Startup", ref y);
+            StartupToggle = new ToggleSwitch();
+            StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
+            AddRow(page, "Start with Windows", "Run Muter when you sign in", StartupToggle, ref y);
+            y += 6;
             AddSection(page, "Hotkey", ref y);
             var hotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
             HotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Cursor = Cursors.Default, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
@@ -326,11 +331,6 @@ namespace Muter.UI
             positionsPanel.Controls.Add(ResetPositionsButton);
             positionsRow = AddRow(page, "Positions", string.Empty, positionsPanel, ref y);
 
-            y += 6;
-            AddSection(page, "Startup", ref y);
-            StartupToggle = new ToggleSwitch();
-            StartupToggle.Toggled += (s, e) => Apply(() => app.SetStartup(StartupToggle.Checked));
-            AddRow(page, "Start with Windows", "Run Muter when you sign in", StartupToggle, ref y);
         }
 
         private void BuildOverlayPage()

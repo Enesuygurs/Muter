@@ -23,7 +23,7 @@ Muter is a simple yet powerful Windows utility that provides a clean, unobtrusiv
 No installation is required.
 
 1.  Go to the **[Releases](https://github.com/Enesuygurs/Muter/releases)** page.
-2.  Download the zip file (for example `Muter.v1.2.zip`) from the latest release.
+2.  Download the zip file (for example `Muter.v1.3.zip`) from the latest release.
 3.  Run the application. An icon will appear in your system tray.
 4.  Press the hotkey or left-click the tray icon to mute or unmute.
 5.  Right-click the tray icon and choose Settings to change the microphones, the hotkey and the overlay.

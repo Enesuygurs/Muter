@@ -169,7 +169,7 @@ namespace Muter.UI
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(BuildOverlayMenu());
             menu.Items.Add(Item("Run Startup", SafeIsStartupEnabled(), ToggleStartup));
-            menu.Items.Add(Item($"Hotkey ({configuredHotkey})...", false, OpenHotkeyDialog));
+            menu.Items.Add(Item($"Hotkey ({HotkeyText.Format(configuredHotkey)})...", false, OpenHotkeyDialog));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Item("Exit", false, ExitThread));
         }

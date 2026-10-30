@@ -51,6 +51,9 @@ namespace Muter.UI
         private readonly CloseRequestFilter closeRequestFilter;
         // A plain hidden top-level window, so "taskkill" always finds a window of ours to send its close request to.
         private readonly NativeWindow closeTarget = new NativeWindow();
+        private readonly Action<FeedbackSound> playSound;
+        private readonly bool realSounds;
+        private volatile bool soundEnabled;
         private MicrophoneStatus status = MicrophoneStatus.ReadFailure;
         private bool audioNotResponding;
         private Hotkey configuredHotkey;
@@ -62,9 +65,14 @@ namespace Muter.UI
         private bool shutDown;
         private SettingsForm settingsForm;
 
-        public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup)
+        // playSound: tests replace the real sounds.
+        public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup,
+            Action<FeedbackSound> playSound = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            this.playSound = playSound ?? FeedbackSounds.Play;
+            realSounds = playSound == null;
+            soundEnabled = settings.soundFeedback;
             this.hotkey = hotkey ?? throw new ArgumentNullException(nameof(hotkey));
             this.startup = startup ?? throw new ArgumentNullException(nameof(startup));
             if (providerFactory == null)
@@ -98,7 +106,14 @@ namespace Muter.UI
             };
 
             audio = new AudioWorker(providerFactory, settings.selectedDeviceId, settings.syncDevices);
-            audio.StatusAvailable += (newStatus, userAction) => Post(() => OnStatus(newStatus, userAction));
+            audio.StatusAvailable += (newStatus, source) =>
+            {
+                // The sound is started right here on the audio thread, as soon as the result is verified, rather than
+                // after the UI thread gets to it.
+                if (source == StatusSource.MuteAction && soundEnabled && !shutDown)
+                    Safely("sound", () => this.playSound(SoundFor(newStatus.State)));
+                Post(() => OnStatus(newStatus, source));
+            };
 
             hotkey.Pressed += (s, e) => ToggleMute();
             pollTimer.Tick += (s, e) => OnPoll();
@@ -115,6 +130,8 @@ namespace Muter.UI
 
             // Until the first reading arrives the tray shows "unknown"; the overlay appears with the first real state.
             UpdateUi(forceOverlay: false, initial: true);
+            if (realSounds && settings.soundFeedback)
+                FeedbackSounds.Prepare();
             audio.RequestRefresh();
             pollTimer.Start();
         }
@@ -189,13 +206,35 @@ namespace Muter.UI
             base.Dispose(disposing);
         }
 
-        private void OnStatus(MicrophoneStatus newStatus, bool userAction)
+        private void OnStatus(MicrophoneStatus newStatus, StatusSource source)
         {
             status = newStatus;
             if (audioNotResponding)
                 Log.Info("Audio system responding again");
             audioNotResponding = false;
-            UpdateUi(forceOverlay: userAction);
+            UpdateUi(forceOverlay: source != StatusSource.Refresh);
+        }
+
+        // The sound tells the verified result, not what was asked for: "muted" only when every microphone reads muted.
+        internal static FeedbackSound SoundFor(MicState state)
+        {
+            switch (state)
+            {
+                case MicState.Muted: return FeedbackSound.Muted;
+                case MicState.Live: return FeedbackSound.Live;
+                default: return FeedbackSound.Warning;
+            }
+        }
+
+        internal void SetSoundFeedback(bool enabled)
+        {
+            settings.soundFeedback = enabled;
+            soundEnabled = enabled;
+            SaveSettings();
+            if (!enabled && realSounds)
+                FeedbackSounds.Release();
+            if (enabled)
+                Safely("sound", () => playSound(SoundFor(audioNotResponding ? MicState.Unknown : status.State)));
         }
 
         // Puts the current state on every surface. Each surface is updated independently so a failure in one cannot
@@ -888,6 +927,9 @@ namespace Muter.UI
             miniIndicator.Dispose();
             pollTimer.Dispose();
             menuFont.Dispose();
+
+            if (realSounds)
+                FeedbackSounds.Release();
 
             // Stops the audio thread, which releases the devices; never blocks exit for long.
             audio.Dispose();

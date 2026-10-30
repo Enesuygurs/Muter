@@ -40,7 +40,7 @@ namespace Muter.Tests
 
         private static TrayApplicationContext Start(FakeAudioEndpointProvider provider, Settings settings, FakeGlobalHotkey hotkey)
         {
-            var app = new TrayApplicationContext(settings, () => provider, hotkey, new StartupRegistration(Application.ExecutablePath, StartupKey));
+            var app = new TrayApplicationContext(settings, () => provider, hotkey, new StartupRegistration(Application.ExecutablePath, StartupKey), TestSetup.Silent);
             Assert.True(app.WaitForAudio());
             return app;
         }
@@ -595,7 +595,7 @@ namespace Muter.Tests
             {
                 SettingsForm form = OpenSettings(app);
                 Assert.StartsWith("1.", SettingsForm.VersionText());
-                foreach (string page in new[] { "General", "Overlay", "Mini indicator" })
+                foreach (string page in new[] { "General", "Hotkey", "Overlay", "Mini indicator" })
                 {
                     form.ShowPage(page);
                     Assert.Equal(page, form.CurrentPage);
@@ -640,7 +640,7 @@ namespace Muter.Tests
                         throw new COMException("audio service not running");
                     return provider;
                 };
-                using (var app = new TrayApplicationContext(NewSettings(), factory, new FakeGlobalHotkey(), new StartupRegistration(Application.ExecutablePath, StartupKey)))
+                using (var app = new TrayApplicationContext(NewSettings(), factory, new FakeGlobalHotkey(), new StartupRegistration(Application.ExecutablePath, StartupKey), TestSetup.Silent))
                 {
                     app.WaitForAudio();
                     Assert.Equal(MicState.Unknown, app.Status.State);

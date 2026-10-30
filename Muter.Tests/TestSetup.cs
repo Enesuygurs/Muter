@@ -21,6 +21,11 @@ namespace Muter.Tests
         {
         }
 
+        // Feedback sounds are not played during tests.
+        public static void Silent(Muter.UI.FeedbackSound sound)
+        {
+        }
+
         // Runs an action on a fresh STA thread (WinForms and the production audio provider use STA).
         public static void RunSta(Action action)
         {

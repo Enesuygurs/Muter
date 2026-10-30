@@ -47,7 +47,9 @@ namespace Muter.Tests
                         Assert.True((style & WS_EX_TOPMOST) != 0, "topmost");
                         Assert.NotEqual(form.Handle, GetForegroundWindow());
                     }
-                    Assert.Equal(before, GetForegroundWindow());
+                    // (The foreground window itself may change meanwhile if someone is using the computer.)
+                    Assert.NotEqual(app.OverlayWindow.Handle, GetForegroundWindow());
+                    Assert.NotEqual(app.MiniIndicator.Handle, GetForegroundWindow());
 
                     TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
                     foreach (Form form in new Form[] { app.OverlayWindow, app.MiniIndicator })
@@ -72,37 +74,53 @@ namespace Muter.Tests
                     {
                         TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
                         TestSetup.PumpUntil(() => false, 200);
-                        IntPtr foreground = GetForegroundWindow();
-                        Rectangle start = app.OverlayWindow.Bounds;
-                        var grab = new Point(start.Left + start.Width / 2, start.Top + 10);
+                        Rectangle start, moved;
 
-                        // Input comes from another thread: while the button is down Windows runs a modal move loop on
-                        // the UI thread, exactly as with a real mouse.
-                        var mouse = new System.Threading.Thread(() =>
+                        // The drag uses the real mouse, so someone using the computer at the same moment can disturb
+                        // it; a disturbed attempt is repeated (up to 3 times).
+                        for (int attempt = 1; ; attempt++)
                         {
-                            MoveMouse(grab);
-                            System.Threading.Thread.Sleep(150);
-                            MouseButton(down: true);
-                            for (int i = 1; i <= 10; i++)
-                            {
-                                System.Threading.Thread.Sleep(30);
-                                MoveMouse(new Point(grab.X - 30 * i, grab.Y - 20 * i));
-                            }
-                            System.Threading.Thread.Sleep(100);
-                            MouseButton(down: false);
-                        });
-                        mouse.Start();
+                            start = app.OverlayWindow.Bounds;
+                            var grab = new Point(start.Left + start.Width / 2, start.Top + 10);
 
-                        Assert.True(TestSetup.PumpUntil(() => !mouse.IsAlive && settings.overlayPosition == "Custom", 5000), "custom position saved");
-                        Rectangle moved = app.OverlayWindow.Bounds;
-                        Assert.InRange(moved.Left - start.Left, -310, -290);
-                        Assert.InRange(moved.Top - start.Top, -210, -190);
+                            // Input comes from another thread: while the button is down Windows runs a modal move loop
+                            // on the UI thread, exactly as with a real mouse.
+                            string underCursor = null;
+                            var mouse = new System.Threading.Thread(() =>
+                            {
+                                MoveMouse(grab);
+                                System.Threading.Thread.Sleep(150);
+                                underCursor = Describe(WindowFromPoint(grab)) + " cursor=" + Cursor.Position;
+                                MouseButton(down: true);
+                                for (int i = 1; i <= 10; i++)
+                                {
+                                    System.Threading.Thread.Sleep(30);
+                                    MoveMouse(new Point(grab.X - 30 * i, grab.Y - 20 * i));
+                                }
+                                System.Threading.Thread.Sleep(100);
+                                MouseButton(down: false);
+                            });
+                            mouse.Start();
+
+                            bool saved = TestSetup.PumpUntil(() => !mouse.IsAlive && settings.overlayPosition == "Custom", 5000);
+                            moved = app.OverlayWindow.Bounds;
+                            int dx = moved.Left - start.Left;
+                            int dy = moved.Top - start.Top;
+                            if (saved && dx >= -310 && dx <= -290 && dy >= -210 && dy <= -190)
+                                break;
+
+                            Assert.True(attempt < 3,
+                                $"drag failed 3 times; last: saved={saved} moved by ({dx},{dy}). overlay {app.OverlayWindow.Handle} visible={app.OverlayWindow.Visible} " +
+                                $"exstyle=0x{GetWindowLong(app.OverlayWindow.Handle, GWL_EXSTYLE):X} under cursor: {underCursor}; foreground: {Describe(GetForegroundWindow())}");
+                            TrayApplicationContextTestsAccess.Click(app, "Overlay", "Reset Positions");
+                            TestSetup.PumpUntil(() => false, 300);
+                        }
 
                         Screen screen = Screen.FromRectangle(moved);
                         Assert.Equal(screen.DeviceName, settings.overlayCustomMonitor);
                         Assert.Equal(moved.Left - screen.WorkingArea.Left, settings.overlayCustomX);
                         Assert.Equal(moved.Top - screen.WorkingArea.Top, settings.overlayCustomY);
-                        Assert.Equal(foreground, GetForegroundWindow());
+                        Assert.NotEqual(app.OverlayWindow.Handle, GetForegroundWindow()); // dragging never activates it
 
                         // Locking again keeps the dragged position.
                         TrayApplicationContextTestsAccess.Click(app, "Overlay", "Unlock Positions");
@@ -180,6 +198,32 @@ namespace Muter.Tests
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr WindowFromPoint(Point point);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder name, int max);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+        private static string Describe(IntPtr hWnd)
+        {
+            var name = new System.Text.StringBuilder(256);
+            GetClassName(hWnd, name, name.Capacity);
+            GetWindowThreadProcessId(hWnd, out uint pid);
+            string process;
+            try
+            {
+                process = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
+            }
+            catch (ArgumentException)
+            {
+                process = "?";
+            }
+            return $"{hWnd} {name} ({process})";
+        }
     }
 
     internal static class TrayApplicationContextTestsAccess

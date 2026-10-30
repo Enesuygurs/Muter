@@ -79,6 +79,7 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float s = DeviceDpi / 96f;
             using (GraphicsPath path = Theme.RoundedRectangle(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), 6 * s))
             using (var fill = new SolidBrush(Theme.Surface))

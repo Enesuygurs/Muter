@@ -31,7 +31,6 @@ namespace Muter.UI.Controls
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
             BackColor = Theme.Surface;
-            Cursor = Cursors.Hand;
             Size = new Size(200, 32);
             animation.Tick += (s, e) => Animate();
         }

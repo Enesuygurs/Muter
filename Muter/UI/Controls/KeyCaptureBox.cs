@@ -34,7 +34,6 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             BackColor = Theme.Background;
             ForeColor = Theme.TextPrimary;
-            Cursor = Cursors.Hand;
         }
 
         // Keycaps to show; when pending, a final "…" cap is added.
@@ -90,6 +89,7 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float scale = DeviceDpi / 96f;
 
             var caps = new List<string>(keycaps);

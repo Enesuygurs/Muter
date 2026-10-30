@@ -17,7 +17,6 @@ namespace Muter.UI.Controls
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
             BackColor = Theme.Background;
-            Cursor = Cursors.Hand;
             Size = new Size(160, 36);
         }
 
@@ -78,6 +77,7 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float s = DeviceDpi / 96f;
             if (selected || hover)
             {
@@ -93,7 +93,7 @@ namespace Muter.UI.Controls
             }
             if (Focused && ShowFocusCues)
             {
-                using (GraphicsPath ring = Theme.RoundedRectangle(new RectangleF(1, 1, Width - 2, Height - 2), 5 * s))
+                using (GraphicsPath ring = Theme.RoundedRectangle(new RectangleF(1.5f, 1.5f, Width - 3f, Height - 3f), 5 * s))
                 using (var pen = new Pen(Theme.TextPrimary, s))
                     g.DrawPath(pen, ring);
             }

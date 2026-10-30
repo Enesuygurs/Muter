@@ -37,7 +37,6 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
             BackColor = Theme.Surface;
             ForeColor = Theme.TextPrimary;
-            Cursor = Cursors.Hand;
             Size = new Size(200, 30);
             menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true };
             menu.Closed += (s, e) => Invalidate();
@@ -169,6 +168,7 @@ namespace Muter.UI.Controls
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float s = DeviceDpi / 96f;
             var bounds = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             bool open = menu.Visible;

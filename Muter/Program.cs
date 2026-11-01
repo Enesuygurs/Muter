@@ -52,7 +52,8 @@ namespace Muter
         // Settings that versions before 1.1 could have saved; any of them means Muter was used before.
         private static readonly string[] LegacySettingNames = { "shortcut", "selectedDeviceId", "selectedDeviceName", "showGui", "syncDevices" };
 
-        // Carries settings over from the previous version and converts the old text hotkey ("SHIFT + F") to key codes.
+        // Converts the text hotkey of version 1.0 ("SHIFT + F") to key codes. (Settings of earlier versions are taken over
+        // by SettingsFileProvider when the settings are first read.)
         // Someone upgrading keeps their hotkey (including the old Shift + F default); a new install gets Hotkey.Default.
         // previousVersion is Settings.GetPreviousVersion; tests replace it.
         internal static void MigrateSettings(Settings settings, Func<string, object> previousVersion = null)

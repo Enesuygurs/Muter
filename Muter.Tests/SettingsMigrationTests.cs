@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Muter.Tests
 {
-    // Runs against the test host's own user.config, never Muter's.
+    // Runs against a temporary settings file (see TestSetup), never Muter's real one.
     public class SettingsMigrationTests
     {
         // Simulates the previous version's user.config: what older versions saved, by setting name.

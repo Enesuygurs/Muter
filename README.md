@@ -59,6 +59,8 @@ Changes made by other applications are picked up immediately, with a re-check ev
 
 Muter writes a log to `%LOCALAPPDATA%\Muter\muter.log` (state changes, hotkey problems, device errors). Only one copy of Muter can run at a time.
 
+The settings are kept in `%LOCALAPPDATA%\Muter\settings.xml`, whatever folder you run Muter from, so a new version can be unzipped anywhere. The first time, Muter takes over the settings of earlier versions.
+
 ## Building
 
 Requires Windows and the .NET SDK (the app targets .NET Framework 4.7.2, which is part of Windows 10/11).

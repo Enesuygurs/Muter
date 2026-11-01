@@ -2,7 +2,7 @@
 
 Muter is a simple yet powerful Windows utility that provides a clean, unobtrusive overlay to show your current microphone status. Never again wonder if your mic is hot! Toggle your microphone with a customizable global hotkey, making it perfect for conference calls, streaming, or online gaming.
 
-![muter](https://github.com/user-attachments/assets/28661ee3-783b-4603-96c3-6aba466711bb)
+![The overlay (ON, OFF, no device) and the mini indicator](docs/images/overlay.png)
 
 ## Features
 
@@ -31,6 +31,11 @@ No installation is required.
 ### Tray menu and settings
 
 Right-click the tray icon to switch between microphones (**Devices**) or to open **Settings**. Changes in the settings window apply immediately.
+
+<p>
+  <img src="docs/images/settings-general.png" alt="Settings: General page" width="49%">
+  <img src="docs/images/settings-hotkey.png" alt="Settings: Hotkey page" width="49%">
+</p>
 
 | Page | Settings |
 |---|---|

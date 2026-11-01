@@ -4,6 +4,8 @@
     <TargetFramework>net472</TargetFramework>
     <IsPackable>false</IsPackable>
     <RootNamespace>Muter.Tests</RootNamespace>
+    <!-- C# 9 for the module initializer in TestSetup.cs. -->
+    <LangVersion>9.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

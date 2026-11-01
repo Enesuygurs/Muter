@@ -17,7 +17,7 @@ using System.Runtime.InteropServices;
 [assembly: Guid("a96241f9-3d3e-484a-b3b5-1e57202b1b6d")]
 
 // The settings do not depend on the version (one fixed file, see SettingsFileProvider).
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]
 
 [assembly: InternalsVisibleTo("Muter.Tests")]

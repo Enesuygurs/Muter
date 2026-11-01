@@ -8,13 +8,29 @@ using Xunit;
 // Hardware and UI tests share real devices, the registry and the screen: run everything sequentially.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
+namespace System.Runtime.CompilerServices
+{
+    // C# 9 module initializers need this attribute; .NET Framework does not have it.
+    [AttributeUsage(AttributeTargets.Method, Inherited = false)]
+    internal sealed class ModuleInitializerAttribute : Attribute
+    {
+    }
+}
+
 namespace Muter.Tests
 {
     internal static class TestSetup
     {
+        // Runs when the test assembly loads, before any test: no test can ever touch the real settings or log.
+        [System.Runtime.CompilerServices.ModuleInitializer]
+        internal static void Redirect() => Init();
+
         static TestSetup()
         {
-            Log.Directory = Path.Combine(Path.GetTempPath(), "MuterTests-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(Path.GetTempPath(), "MuterTests-" + Guid.NewGuid().ToString("N"));
+            Log.Directory = root;
+            Muter.Properties.SettingsFileProvider.Directory = Path.Combine(root, "settings");
+            Muter.Properties.SettingsFileProvider.LegacyDirectory = Path.Combine(root, "legacy");
             // The app follows the Windows display language by default; the tests check the English texts.
             System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
         }

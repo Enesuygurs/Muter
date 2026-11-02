@@ -65,6 +65,7 @@ namespace Muter.UI
         private bool hotkeyDialogOpen;
         private bool shutDown;
         private SettingsForm settingsForm;
+        private bool lightTaskbar = TaskbarTheme.IsLight();
 
         // playSound and isKeyDown: tests replace the real sounds and the real keyboard.
         public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup,
@@ -100,7 +101,7 @@ namespace Muter.UI
                 e.Cancel = false;
             };
 
-            trayIcon = new NotifyIcon { ContextMenuStrip = menu, Icon = AppResources.TrayIcon(StatusVisual.Unknown, false), Text = "Muter", Visible = true };
+            trayIcon = new NotifyIcon { ContextMenuStrip = menu, Icon = AppResources.TrayIcon(StatusVisual.Unknown, false, TrayStyle), Text = "Muter", Visible = true };
             trayIcon.MouseClick += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left)
@@ -123,6 +124,7 @@ namespace Muter.UI
             pollTimer.Tick += (s, e) => OnPoll();
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged += OnPowerModeChanged;
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
             Application.AddMessageFilter(closeRequestFilter = new CloseRequestFilter(this));
 
             ApplyOverlaySettings();
@@ -288,7 +290,7 @@ namespace Muter.UI
 
             Safely("tray icon", () =>
             {
-                trayIcon.Icon = AppResources.TrayIcon(presentation.Visual, alternateTrayIcons);
+                trayIcon.Icon = AppResources.TrayIcon(presentation.Visual, alternateTrayIcons, TrayStyle);
                 trayIcon.Text = presentation.Tooltip;
             });
             Safely("overlay", () => overlay.SetPresentation(presentation));
@@ -427,6 +429,30 @@ namespace Muter.UI
             {
                 overlay.UpdateLayout();
                 miniIndicator.ApplyVisibility();
+            });
+        }
+
+        // The discreet tray icon follows the taskbar: white on a dark one, black on a light one.
+        internal TrayIconStyle TrayStyle => !settings.discreetTrayIcon ? TrayIconStyle.Colored
+            : lightTaskbar ? TrayIconStyle.Black : TrayIconStyle.White;
+
+        internal void SetDiscreetTrayIcon(bool enabled)
+        {
+            settings.discreetTrayIcon = enabled;
+            SaveSettings();
+            UpdateUi(forceOverlay: false);
+        }
+
+        // Switching Windows between light and dark mode.
+        private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            Post(() =>
+            {
+                bool light = TaskbarTheme.IsLight();
+                if (light == lightTaskbar)
+                    return;
+                lightTaskbar = light;
+                UpdateUi(forceOverlay: false);
             });
         }
 
@@ -995,6 +1021,7 @@ namespace Muter.UI
             pushToTalkRelease.Dispose();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             Application.RemoveMessageFilter(closeRequestFilter);
             closeTarget.DestroyHandle();
             overlay.FormClosing -= OnOverlayClosing;

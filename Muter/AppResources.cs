@@ -1,44 +1,56 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
 namespace Muter
 {
+    // Colourful (green / red / gray) or discreet: one plain colour like Windows' own tray icons, white for a dark
+    // taskbar and black for a light one.
+    internal enum TrayIconStyle
+    {
+        Colored,
+        White,
+        Black,
+    }
+
     // Icons and images embedded from the Resources folder (see Muter.csproj). Loaded once and shared; never dispose them.
     internal static class AppResources
     {
         private static readonly Lazy<Icon> appIcon = new Lazy<Icon>(() => LoadIcon("muter.ico", SystemInformation.IconSize));
-        private static readonly Lazy<Icon> trayLive = new Lazy<Icon>(() => LoadIcon("muteron.ico", SystemInformation.SmallIconSize));
-        private static readonly Lazy<Icon> trayMuted = new Lazy<Icon>(() => LoadIcon("muteroff.ico", SystemInformation.SmallIconSize));
-        private static readonly Lazy<Icon> trayNoDevice = new Lazy<Icon>(() => LoadIcon("nodevice.ico", SystemInformation.SmallIconSize));
-        private static readonly Lazy<System.Collections.Generic.Dictionary<Icon, Icon>> alternates = new Lazy<System.Collections.Generic.Dictionary<Icon, Icon>>(() =>
-            new System.Collections.Generic.Dictionary<Icon, Icon>
-            {
-                [TrayLive] = (Icon)TrayLive.Clone(),
-                [TrayMuted] = (Icon)TrayMuted.Clone(),
-                [TrayNoDevice] = (Icon)TrayNoDevice.Clone(),
-            });
-        private static readonly Lazy<Bitmap> imageLive =new Lazy<Bitmap>(() => LoadBitmap("muteron.png"));
+        private static readonly Dictionary<string, Icon> trayIcons = new Dictionary<string, Icon>();
+        private static readonly Lazy<Bitmap> imageLive = new Lazy<Bitmap>(() => LoadBitmap("muteron.png"));
         private static readonly Lazy<Bitmap> imageMuted = new Lazy<Bitmap>(() => LoadBitmap("muteroff.png"));
         private static readonly Lazy<Bitmap> imageNoDevice = new Lazy<Bitmap>(() => LoadBitmap("nodevice.png"));
 
         public static Icon AppIcon => appIcon.Value;
 
-        public static Icon TrayLive => trayLive.Value;
+        public static Icon TrayLive => TrayIcon(UI.StatusVisual.Live, false);
 
-        public static Icon TrayMuted => trayMuted.Value;
+        public static Icon TrayMuted => TrayIcon(UI.StatusVisual.Muted, false);
 
-        public static Icon TrayNoDevice => trayNoDevice.Value;
+        public static Icon TrayNoDevice => TrayIcon(UI.StatusVisual.NoDevice, false);
 
-        // Tray icon for a state. The alternate instance has the same image; switching to it forces the tray icon to be
-        // sent to Explorer again (NotifyIcon skips updates when the icon object is unchanged).
-        public static Icon TrayIcon(UI.StatusVisual visual, bool alternate)
+        // Tray icon for a state; Unknown looks like Live. The alternate instance has the same image; switching to it
+        // forces the tray icon to be sent to Explorer again (NotifyIcon skips updates when the icon object is unchanged).
+        public static Icon TrayIcon(UI.StatusVisual visual, bool alternate, TrayIconStyle style = TrayIconStyle.Colored)
         {
-            Icon icon = visual == UI.StatusVisual.Muted ? TrayMuted
-                : visual == UI.StatusVisual.NoDevice ? TrayNoDevice
-                : TrayLive;
-            return alternate ? alternates.Value[icon] : icon;
+            string name = visual == UI.StatusVisual.Muted ? "muteroff"
+                : visual == UI.StatusVisual.NoDevice ? "nodevice"
+                : "muteron";
+            if (style != TrayIconStyle.Colored)
+                name += style == TrayIconStyle.White ? "-white" : "-black";
+            string key = name + (alternate ? "|alternate" : string.Empty);
+            lock (trayIcons)
+            {
+                if (!trayIcons.TryGetValue(key, out Icon icon))
+                {
+                    icon = alternate ? (Icon)TrayIcon(visual, false, style).Clone() : LoadIcon(name + ".ico", SystemInformation.SmallIconSize);
+                    trayIcons[key] = icon;
+                }
+                return icon;
+            }
         }
 
         public static Bitmap ImageLive => imageLive.Value;

@@ -27,7 +27,7 @@ namespace Muter.UI
         private const int TitleBarHeight = 44;
         private const int RowHeight = 52;
         private const int RowGap = 6;
-        private const int WindowHeight = 580;
+        private const int WindowHeight = 660;
 
         internal const string PageGeneral = "General";
         internal const string PageHotkey = "Hotkey";
@@ -117,6 +117,8 @@ namespace Muter.UI
         internal SegmentedControl MiniSizeSegments { get; private set; }
 
         internal DropdownButton LanguageDropdown { get; private set; }
+
+        internal ToggleSwitch DiscreetTrayToggle { get; private set; }
 
         internal string CurrentPage => pages.First(p => p.Value.Visible).Key;
 
@@ -349,6 +351,12 @@ namespace Muter.UI
             positionsRow = AddRow(page, Lang.Positions, string.Empty, positionsPanel, ref y);
 
             y += 6;
+            AddSection(page, Lang.SectionTrayIcon, ref y);
+            DiscreetTrayToggle = new ToggleSwitch();
+            DiscreetTrayToggle.Toggled += (s, e) => Apply(() => app.SetDiscreetTrayIcon(DiscreetTrayToggle.Checked));
+            AddRow(page, Lang.DiscreetTrayIcon, Lang.DiscreetTrayIconHint, DiscreetTrayToggle, ref y);
+
+            y += 6;
             AddSection(page, Lang.SectionLanguage, ref y);
             LanguageDropdown = new DropdownButton { Size = new Size(230, 30), Font = Font };
             LanguageDropdown.SetOptions(new[] { new DropdownOption(Lang.LanguageSystem, Languages.System) }
@@ -469,6 +477,7 @@ namespace Muter.UI
                 SyncToggle.Checked = settings.syncDevices;
                 HotkeyKeys.Keycaps = HotkeyText.Parts(app.ConfiguredHotkey);
                 StartupToggle.Checked = app.IsStartupEnabled();
+                DiscreetTrayToggle.Checked = settings.discreetTrayIcon;
                 SoundToggle.Checked = settings.soundFeedback;
                 PushToTalkToggle.Checked = settings.pushToTalk;
 

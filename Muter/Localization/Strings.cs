@@ -101,6 +101,9 @@ namespace Muter.Localization
         public string Language { get; set; }
         public string LanguageHint { get; set; }
         public string LanguageSystem { get; set; }
+        public string SectionTrayIcon { get; set; }
+        public string DiscreetTrayIcon { get; set; }
+        public string DiscreetTrayIconHint { get; set; }
         public string MuteHotkey { get; set; }
         public string MuteHotkeyHint { get; set; }
         public string Change { get; set; }

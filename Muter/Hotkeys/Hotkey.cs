@@ -22,6 +22,9 @@ namespace Muter.Hotkeys
         // What versions before 1.1 used when no hotkey had been saved; existing users keep it.
         public static readonly Hotkey LegacyDefault = new Hotkey(Keys.F, HotkeyModifiers.Shift);
 
+        // The default of the hotkey that mutes the app in front.
+        public static readonly Hotkey AppDefault = new Hotkey(Keys.F10, HotkeyModifiers.Control | HotkeyModifiers.Shift);
+
         public Hotkey(Keys key, HotkeyModifiers modifiers)
         {
             Key = key;

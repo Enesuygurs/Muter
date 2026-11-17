@@ -120,6 +120,12 @@ namespace Muter.UI
 
         internal ToggleSwitch DiscreetTrayToggle { get; private set; }
 
+        internal ToggleSwitch AppMuteToggle { get; private set; }
+
+        internal KeyCaptureBox AppHotkeyKeys { get; private set; }
+
+        internal FlatButton ChangeAppHotkeyButton { get; private set; }
+
         internal string CurrentPage => pages.First(p => p.Value.Visible).Key;
 
         #endregion
@@ -389,6 +395,20 @@ namespace Muter.UI
             AddRow(page, Lang.PushToTalk, Lang.PushToTalkHint, PushToTalkToggle, ref y);
 
             y += 6;
+            AddSection(page, Lang.SectionActiveApp, ref y);
+            AppMuteToggle = new ToggleSwitch();
+            AppMuteToggle.Toggled += (s, e) => Apply(() => app.SetAppMuteEnabled(AppMuteToggle.Checked));
+            AddRow(page, Lang.MuteActiveApp, Lang.MuteActiveAppHint, AppMuteToggle, ref y);
+
+            var appHotkeyPanel = new Panel { Size = new Size(260, 32), BackColor = Theme.Surface };
+            AppHotkeyKeys = new KeyCaptureBox { Compact = true, Location = new Point(0, 2), Size = new Size(170, 28), BackColor = Theme.Surface, TabStop = false, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ChangeAppHotkeyButton = new FlatButton { Text = Lang.Change, Location = new Point(180, 0), Size = new Size(80, 32), BackColor = Theme.Surface, Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold) };
+            ChangeAppHotkeyButton.Click += (s, e) => app.OpenAppHotkeyDialog(this);
+            appHotkeyPanel.Controls.Add(AppHotkeyKeys);
+            appHotkeyPanel.Controls.Add(ChangeAppHotkeyButton);
+            AddRow(page, Lang.AppHotkey, Lang.AppHotkeyHint, appHotkeyPanel, ref y);
+
+            y += 6;
             AddSection(page, Lang.SectionSound, ref y);
             SoundToggle = new ToggleSwitch();
             SoundToggle.Toggled += (s, e) => Apply(() => app.SetSoundFeedback(SoundToggle.Checked));
@@ -476,6 +496,8 @@ namespace Muter.UI
                     .Select(o => o.Value).FirstOrDefault(v => string.Equals((string)v, deviceValue, StringComparison.OrdinalIgnoreCase)) ?? deviceValue;
                 SyncToggle.Checked = settings.syncDevices;
                 HotkeyKeys.Keycaps = HotkeyText.Parts(app.ConfiguredHotkey);
+                AppMuteToggle.Checked = settings.appMuteEnabled;
+                AppHotkeyKeys.Keycaps = HotkeyText.Parts(app.ConfiguredAppHotkey);
                 StartupToggle.Checked = app.IsStartupEnabled();
                 DiscreetTrayToggle.Checked = settings.discreetTrayIcon;
                 SoundToggle.Checked = settings.soundFeedback;

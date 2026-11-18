@@ -131,7 +131,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "A plain icon like Windows' own, not green and red",
             SectionActiveApp = "Active app",
             MuteActiveApp = "Mute the active app",
-            MuteActiveAppHint = "A second hotkey mutes or unmutes the app in front",
+            MuteActiveAppHint = "Turns the sound of the app in front off and on with a hotkey",
             AppHotkey = "App hotkey",
             AppHotkeyHint = "Mutes the app in front",
             AppHotkeyDescription = "Press the keys you want to use to mute and unmute the sound of the app in front.",

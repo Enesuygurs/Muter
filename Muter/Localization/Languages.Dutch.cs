@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Een eenvoudig pictogram zoals die van Windows, niet groen en rood",
             SectionActiveApp = "Actieve app",
             MuteActiveApp = "Actieve app dempen",
-            MuteActiveAppHint = "Een tweede sneltoets dempt de app op de voorgrond",
+            MuteActiveAppHint = "Dempt en ontdempt de app op de voorgrond met een sneltoets",
             AppHotkey = "App-sneltoets",
             AppHotkeyHint = "Dempt de app op de voorgrond",
             AppHotkeyDescription = "Druk op de toetsen waarmee je het geluid van de app op de voorgrond wilt dempen en weer aanzetten.",

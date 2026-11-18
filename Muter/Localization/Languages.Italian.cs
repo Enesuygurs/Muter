@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Un'icona semplice come quelle di Windows, senza verde e rosso",
             SectionActiveApp = "App attiva",
             MuteActiveApp = "Silenzia l'app attiva",
-            MuteActiveAppHint = "Una seconda scorciatoia silenzia l'app in primo piano",
+            MuteActiveAppHint = "Silenzia e riattiva l'app in primo piano con una scorciatoia",
             AppHotkey = "Scorciatoia app",
             AppHotkeyHint = "Silenzia l'app in primo piano",
             AppHotkeyDescription = "Premi i tasti che vuoi usare per silenziare e riattivare l'audio dell'app in primo piano.",

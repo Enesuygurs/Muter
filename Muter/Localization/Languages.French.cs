@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Une icône sobre comme celles de Windows, sans vert ni rouge",
             SectionActiveApp = "Application active",
             MuteActiveApp = "Couper l'application active",
-            MuteActiveAppHint = "Un 2e raccourci coupe le son de l'appli au premier plan",
+            MuteActiveAppHint = "Coupe et rétablit le son de l'appli au premier plan par raccourci",
             AppHotkey = "Raccourci appli",
             AppHotkeyHint = "Coupe l'appli au premier plan",
             AppHotkeyDescription = "Appuyez sur les touches à utiliser pour couper et rétablir le son de l'application au premier plan.",

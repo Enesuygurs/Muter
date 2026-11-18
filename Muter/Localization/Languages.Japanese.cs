@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "緑と赤ではなく、Windows 標準のようなシンプルなアイコン",
             SectionActiveApp = "アクティブなアプリ",
             MuteActiveApp = "アクティブなアプリをミュート",
-            MuteActiveAppHint = "2 つ目のホットキーで前面のアプリをミュートします",
+            MuteActiveAppHint = "前面のアプリの音をホットキーでミュート・解除します",
             AppHotkey = "アプリのホットキー",
             AppHotkeyHint = "前面のアプリをミュート",
             AppHotkeyDescription = "前面のアプリの音をミュートして解除するキーを押してください。",

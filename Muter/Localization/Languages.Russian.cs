@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Простой значок в стиле Windows вместо зелёного и красного",
             SectionActiveApp = "Активное приложение",
             MuteActiveApp = "Отключать звук активного приложения",
-            MuteActiveAppHint = "Второе сочетание отключает звук приложения на переднем плане",
+            MuteActiveAppHint = "Выключает и включает звук приложения на экране сочетанием клавиш",
             AppHotkey = "Клавиши приложения",
             AppHotkeyHint = "Звук приложения на экране",
             AppHotkeyDescription = "Нажмите клавиши, которыми хотите выключать и включать звук приложения на переднем плане.",

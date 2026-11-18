@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Prosta ikona jak w Windows zamiast zielonej i czerwonej",
             SectionActiveApp = "Aktywna aplikacja",
             MuteActiveApp = "Wyciszaj aktywną aplikację",
-            MuteActiveAppHint = "Drugi skrót wycisza aplikację na pierwszym planie",
+            MuteActiveAppHint = "Wycisza i włącza aplikację na wierzchu skrótem",
             AppHotkey = "Skrót aplikacji",
             AppHotkeyHint = "Wycisza aplikację na wierzchu",
             AppHotkeyDescription = "Naciśnij klawisze, którymi chcesz wyciszać i włączać dźwięk aplikacji na pierwszym planie.",

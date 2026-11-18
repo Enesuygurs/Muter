@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "使用类似 Windows 自带的简洁图标，而非绿色和红色",
             SectionActiveApp = "活动应用",
             MuteActiveApp = "将活动应用静音",
-            MuteActiveAppHint = "用第二个快捷键将前台应用静音或取消静音",
+            MuteActiveAppHint = "用快捷键将前台应用静音或取消静音",
             AppHotkey = "应用快捷键",
             AppHotkeyHint = "将前台应用静音",
             AppHotkeyDescription = "请按下用于将前台应用静音和取消静音的按键。",

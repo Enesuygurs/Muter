@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "초록·빨강 대신 Windows 기본과 같은 단순한 아이콘",
             SectionActiveApp = "활성 앱",
             MuteActiveApp = "활성 앱 음소거",
-            MuteActiveAppHint = "두 번째 단축키로 앞에 있는 앱을 음소거합니다",
+            MuteActiveAppHint = "단축키로 앞에 있는 앱을 음소거하거나 해제합니다",
             AppHotkey = "앱 단축키",
             AppHotkeyHint = "앞에 있는 앱 음소거",
             AppHotkeyDescription = "앞에 있는 앱의 소리를 음소거하고 해제할 때 사용할 키를 누르세요.",

@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Schlichtes Symbol wie die von Windows statt Grün und Rot",
             SectionActiveApp = "Aktive App",
             MuteActiveApp = "Aktive App stummschalten",
-            MuteActiveAppHint = "Ein zweites Tastenkürzel schaltet die App im Vordergrund stumm",
+            MuteActiveAppHint = "Schaltet den Ton der App im Vordergrund per Tastenkürzel aus und ein",
             AppHotkey = "App-Tastenkürzel",
             AppHotkeyHint = "Für die App im Vordergrund",
             AppHotkeyDescription = "Drücken Sie die Tasten, mit denen Sie den Ton der App im Vordergrund stumm- und wieder einschalten möchten.",

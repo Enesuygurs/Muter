@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Yeşil ve kırmızı yerine Windows'unkiler gibi sade bir simge",
             SectionActiveApp = "Aktif uygulama",
             MuteActiveApp = "Aktif uygulamayı sessize al",
-            MuteActiveAppHint = "İkinci bir kısayol öndeki uygulamanın sesini kapatıp açar",
+            MuteActiveAppHint = "Öndeki uygulamanın sesini kısayolla kapatıp açar",
             AppHotkey = "Uygulama kısayolu",
             AppHotkeyHint = "Öndeki uygulamanın sesini kapatır",
             AppHotkeyDescription = "Öndeki uygulamanın sesini kapatıp açmak için kullanmak istediğiniz tuşlara basın.",

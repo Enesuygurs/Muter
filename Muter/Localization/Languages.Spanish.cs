@@ -88,7 +88,7 @@ namespace Muter.Localization
             DiscreetTrayIconHint = "Un icono sencillo como los de Windows, sin verde ni rojo",
             SectionActiveApp = "Aplicación activa",
             MuteActiveApp = "Silenciar la aplicación activa",
-            MuteActiveAppHint = "Un segundo atajo silencia la aplicación en primer plano",
+            MuteActiveAppHint = "Silencia y reactiva la app en primer plano con un atajo",
             AppHotkey = "Atajo de aplicación",
             AppHotkeyHint = "Silencia la app en primer plano",
             AppHotkeyDescription = "Pulsa las teclas que quieres usar para silenciar y activar el sonido de la aplicación en primer plano.",

@@ -104,6 +104,13 @@ namespace Muter.Localization
         public string SectionTrayIcon { get; set; }
         public string DiscreetTrayIcon { get; set; }
         public string DiscreetTrayIconHint { get; set; }
+        public string SectionActiveApp { get; set; }
+        public string MuteActiveApp { get; set; }
+        public string MuteActiveAppHint { get; set; }
+        public string AppHotkey { get; set; }
+        public string AppHotkeyHint { get; set; }
+        public string AppHotkeyDescription { get; set; }
+        public string HotkeyTakenByMuter { get; set; }
         public string MuteHotkey { get; set; }
         public string MuteHotkeyHint { get; set; }
         public string Change { get; set; }

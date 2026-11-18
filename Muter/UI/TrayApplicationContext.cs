@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Muter.Audio;
@@ -66,11 +67,21 @@ namespace Muter.UI
         private bool shutDown;
         private SettingsForm settingsForm;
         private bool lightTaskbar = TaskbarTheme.IsLight();
+        private readonly Func<IGlobalHotkey> appHotkeyFactory;
+        private readonly AppMuter appMuter;
+        private readonly Func<int> foregroundProcess;
+        private IGlobalHotkey appHotkey;
+        private Hotkey configuredAppHotkey = Hotkey.AppDefault;
 
-        // playSound and isKeyDown: tests replace the real sounds and the real keyboard.
+        // playSound, isKeyDown, appHotkeyFactory, appMuter and foregroundProcess: tests replace the real sounds, keyboard,
+        // app hotkey, app sessions and window in front.
         public TrayApplicationContext(Settings settings, Func<IAudioEndpointProvider> providerFactory, IGlobalHotkey hotkey, StartupRegistration startup,
-            Action<FeedbackSound> playSound = null, Func<Keys, bool> isKeyDown = null)
+            Action<FeedbackSound> playSound = null, Func<Keys, bool> isKeyDown = null,
+            Func<IGlobalHotkey> appHotkeyFactory = null, AppMuter appMuter = null, Func<int> foregroundProcess = null)
         {
+            this.appHotkeyFactory = appHotkeyFactory ?? (() => new GlobalHotkey());
+            this.appMuter = appMuter ?? new AppMuter();
+            this.foregroundProcess = foregroundProcess ?? ForegroundApp.ProcessId;
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.playSound = playSound ?? FeedbackSounds.Play;
             realSounds = playSound == null;
@@ -129,6 +140,7 @@ namespace Muter.UI
 
             ApplyOverlaySettings();
             RegisterConfiguredHotkey(notifyOnFailure: true);
+            RegisterAppHotkey(notifyOnFailure: true);
             RepairStartupEntry();
             RebuildMenu();
             Log.Info($"DPI awareness: {DpiHelper.DescribeProcessAwareness()}; screens: "
@@ -464,6 +476,7 @@ namespace Muter.UI
             {
                 audio.NotifyDevicesChanged();
                 RegisterConfiguredHotkey(notifyOnFailure: true);
+                RegisterAppHotkey(notifyOnFailure: true);
             });
         }
 
@@ -845,7 +858,7 @@ namespace Muter.UI
 
         #endregion
 
-        #region Hotkey and startup
+        #region Hotkey
 
         internal Hotkey ConfiguredHotkey => configuredHotkey;
 
@@ -867,8 +880,9 @@ namespace Muter.UI
             if (hotkeyDialogOpen || shutDown)
                 return;
             hotkeyDialogOpen = true;
-            // Release the hotkey so pressing it while choosing a new one does not toggle the microphone.
+            // Release the hotkeys so pressing them while choosing a new one does nothing.
             hotkey.Suspend();
+            appHotkey?.Suspend();
             try
             {
                 using (var form = new HotkeyForm(configuredHotkey, TryApplyHotkey))
@@ -882,12 +896,15 @@ namespace Muter.UI
             {
                 hotkeyDialogOpen = false;
                 RegisterConfiguredHotkey(notifyOnFailure: true);
+                RegisterAppHotkey(notifyOnFailure: true);
                 RaiseSettingsChanged();
             }
         }
 
         private string TryApplyHotkey(Hotkey newHotkey)
         {
+            if (settings.appMuteEnabled && newHotkey.Equals(configuredAppHotkey))
+                return string.Format(Strings.Current.HotkeyTakenByMuter, HotkeyText.Format(newHotkey));
             if (!hotkey.TrySet(newHotkey, out string error))
                 return error;
             configuredHotkey = newHotkey;
@@ -897,6 +914,141 @@ namespace Muter.UI
             SaveSettings();
             return null;
         }
+
+        #endregion
+
+        #region Muting the app in front
+
+        internal Hotkey ConfiguredAppHotkey => configuredAppHotkey;
+
+        internal bool AppHotkeyRegistered => appHotkey != null && appHotkey.IsRegistered;
+
+        // For tests: the last app mute, which runs off the UI thread.
+        internal Task<AppMuteResult> LastAppMute { get; private set; }
+
+        internal void SetAppMuteEnabled(bool enabled)
+        {
+            settings.appMuteEnabled = enabled;
+            SaveSettings();
+            RegisterAppHotkey(notifyOnFailure: true);
+            RaiseSettingsChanged();
+        }
+
+        // The app hotkey is registered only while the feature is on.
+        private void RegisterAppHotkey(bool notifyOnFailure)
+        {
+            if (shutDown)
+                return;
+            configuredAppHotkey = Hotkey.TryFromSettings(settings.appMuteHotkeyKey, settings.appMuteHotkeyModifiers, out Hotkey fromSettings)
+                ? fromSettings
+                : Hotkey.AppDefault;
+            if (!settings.appMuteEnabled)
+            {
+                appHotkey?.Suspend();
+                return;
+            }
+            EnsureAppHotkey();
+            if (appHotkey.IsRegistered && appHotkey.Current.Equals(configuredAppHotkey))
+                return;
+
+            string error;
+            if (configuredAppHotkey.Equals(configuredHotkey))
+            {
+                appHotkey.Suspend();
+                error = string.Format(Strings.Current.HotkeyTakenByMuter, HotkeyText.Format(configuredAppHotkey));
+            }
+            else if (appHotkey.TrySet(configuredAppHotkey, out error))
+            {
+                return;
+            }
+            if (notifyOnFailure)
+                ShowBalloon(Strings.Current.HotkeyNotActiveTitle, string.Format(Strings.Current.HotkeyNotActiveText, error), ToolTipIcon.Warning);
+        }
+
+        private void EnsureAppHotkey()
+        {
+            if (appHotkey != null)
+                return;
+            appHotkey = appHotkeyFactory();
+            appHotkey.Pressed += (s, e) => OnAppHotkeyPressed();
+        }
+
+        private void OnAppHotkeyPressed()
+        {
+            if (shutDown || !settings.appMuteEnabled)
+                return;
+            int processId;
+            try
+            {
+                processId = foregroundProcess();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Could not find the app in front", ex);
+                return;
+            }
+            // Core Audio calls can take a moment; they run on a thread-pool (MTA) thread, not the UI thread.
+            LastAppMute = Task.Run(() =>
+            {
+                try
+                {
+                    AppMuteResult result = appMuter.Toggle(processId);
+                    Log.Info($"App in front ({ForegroundApp.Describe(processId)}): {result}");
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Muting the app in front failed", ex);
+                    return AppMuteResult.NoSound;
+                }
+            });
+        }
+
+        internal void OpenAppHotkeyDialog(IWin32Window owner = null)
+        {
+            if (hotkeyDialogOpen || shutDown)
+                return;
+            hotkeyDialogOpen = true;
+            hotkey.Suspend();
+            appHotkey?.Suspend();
+            try
+            {
+                using (var form = new HotkeyForm(configuredAppHotkey, TryApplyAppHotkey, Strings.Current.AppHotkey, Strings.Current.AppHotkeyDescription, Hotkey.AppDefault))
+                {
+                    if (owner != null)
+                        form.StartPosition = FormStartPosition.CenterParent;
+                    form.ShowDialog(owner);
+                }
+            }
+            finally
+            {
+                hotkeyDialogOpen = false;
+                RegisterConfiguredHotkey(notifyOnFailure: true);
+                RegisterAppHotkey(notifyOnFailure: true);
+                RaiseSettingsChanged();
+            }
+        }
+
+        internal string TryApplyAppHotkey(Hotkey newHotkey)
+        {
+            if (newHotkey.Equals(configuredHotkey))
+                return string.Format(Strings.Current.HotkeyTakenByMuter, HotkeyText.Format(newHotkey));
+            if (settings.appMuteEnabled)
+            {
+                EnsureAppHotkey();
+                if (!appHotkey.TrySet(newHotkey, out string error))
+                    return error;
+            }
+            configuredAppHotkey = newHotkey;
+            settings.appMuteHotkeyKey = (int)newHotkey.Key;
+            settings.appMuteHotkeyModifiers = (int)newHotkey.Modifiers;
+            SaveSettings();
+            return null;
+        }
+
+        #endregion
+
+        #region Startup
 
         internal bool IsStartupEnabled()
         {
@@ -1030,6 +1182,7 @@ namespace Muter.UI
             try
             {
                 hotkey.Dispose();
+                appHotkey?.Dispose();
             }
             catch (Exception ex)
             {

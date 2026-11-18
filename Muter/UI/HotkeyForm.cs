@@ -38,6 +38,7 @@ namespace Muter.UI
         // Tries to register and save the hotkey; returns null on success or an error message.
         private readonly Func<Hotkey, string> applyHotkey;
         private readonly Hotkey currentHotkey;
+        private readonly Hotkey defaultHotkey;
         private Hotkey? candidate;
 
         #endregion
@@ -49,10 +50,16 @@ namespace Muter.UI
         {
         }
 
-        public HotkeyForm(Hotkey currentHotkey, Func<Hotkey, string> applyHotkey)
+        // title, description and defaultHotkey: the microphone hotkey's unless given (the app hotkey uses its own).
+        public HotkeyForm(Hotkey currentHotkey, Func<Hotkey, string> applyHotkey, string title = null, string description = null, Hotkey? defaultHotkey = null)
         {
             InitializeComponent();
+            this.defaultHotkey = defaultHotkey ?? Hotkey.Default;
             ApplyLanguage();
+            if (title != null)
+                titleLabel.Text = title;
+            if (description != null)
+                descriptionLabel.Text = description;
             this.applyHotkey = applyHotkey ?? throw new ArgumentNullException(nameof(applyHotkey));
             this.currentHotkey = currentHotkey;
             Icon = AppResources.AppIcon;
@@ -209,7 +216,7 @@ namespace Muter.UI
             else
             {
                 captureBox.Keycaps = null;
-                ShowResult(KeyCaptureState.Idle, string.Format(Strings.Current.HotkeyExample, HotkeyText.Format(Hotkey.Default)), canSave: false);
+                ShowResult(KeyCaptureState.Idle, string.Format(Strings.Current.HotkeyExample, HotkeyText.Format(defaultHotkey)), canSave: false);
             }
         }
 
@@ -252,7 +259,7 @@ namespace Muter.UI
 
         private void ResetButton_Click(object sender, EventArgs e)
         {
-            SetCandidate(Hotkey.Default);
+            SetCandidate(defaultHotkey);
             captureBox.Focus();
         }
 

@@ -322,5 +322,41 @@ namespace Muter.Properties {
                 this["discreetTrayIcon"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool appMuteEnabled {
+            get {
+                return ((bool)(this["appMuteEnabled"]));
+            }
+            set {
+                this["appMuteEnabled"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int appMuteHotkeyKey {
+            get {
+                return ((int)(this["appMuteHotkeyKey"]));
+            }
+            set {
+                this["appMuteHotkeyKey"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int appMuteHotkeyModifiers {
+            get {
+                return ((int)(this["appMuteHotkeyModifiers"]));
+            }
+            set {
+                this["appMuteHotkeyModifiers"] = value;
+            }
+        }
     }
 }

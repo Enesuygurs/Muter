@@ -33,20 +33,21 @@ namespace Muter.UI.Controls
 
         protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle image = e.ImageRectangle;
-            float s = image.Height / 16f;
-            // Centred like the text, and moved right a little: at the margin's left edge it looks cut off from the text.
-            var box = new Rectangle(image.X + (int)(5 * s), (e.Item.Height - image.Height) / 2, image.Width, image.Height);
-            using (var pen = new Pen(Theme.Accent, 2f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            // The checked entry is marked by the accent bar on its left edge instead of a check mark.
+        }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            base.OnRenderMenuItemBackground(e);
+            if (e.Item.IsOnDropDown && e.Item is ToolStripMenuItem item && item.Checked)
             {
-                g.DrawLines(pen, new[]
-                {
-                    new PointF(box.Left + 3 * s, box.Top + 8.5f * s),
-                    new PointF(box.Left + 6.5f * s, box.Top + 12 * s),
-                    new PointF(box.Left + 13 * s, box.Top + 4.5f * s),
-                });
+                float s = e.ToolStrip.DeviceDpi / 96f;
+                float height = 14 * s;
+                var graphics = e.Graphics;
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (GraphicsPath bar = Theme.RoundedRectangle(new RectangleF(0, (e.Item.Height - height) / 2, 3 * s, height), 1.5f * s))
+                using (var brush = new SolidBrush(Theme.Accent))
+                    graphics.FillPath(brush, bar);
             }
         }
 

@@ -38,7 +38,7 @@ namespace Muter.UI.Controls
             BackColor = Theme.Surface;
             ForeColor = Theme.TextPrimary;
             Size = new Size(208, 32);
-            menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), ShowImageMargin = false, ShowCheckMargin = false, DropShadowEnabled = true };
+            menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, DropShadowEnabled = true };
             menu.Closed += (s, e) => Invalidate();
         }
 

@@ -24,7 +24,7 @@ namespace Muter.UI.Controls
                     continue;
                 int textHeight = TextRenderer.MeasureText("Ag", item.Font).Height;
                 int vertical = System.Math.Max(0, ((int)(RowHeight * scale) - textHeight - 4) / 2);
-                item.Padding = new Padding(0, vertical, extraWidth, vertical);
+                item.Padding = new Padding((int)(10 * scale), vertical, extraWidth, vertical);
             }
         }
 

@@ -105,7 +105,7 @@ namespace Muter.UI
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
 
-            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer() };
+            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer(), ShowCheckMargin = false };
             menu.Opening += (s, e) =>
             {
                 RebuildMenu();
@@ -243,6 +243,21 @@ namespace Muter.UI
             menu.Items.Add(Item(Strings.Current.MenuSettings, false, () => OpenSettings()));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Item(Strings.Current.MenuExit, false, ExitThread));
+            PadItems(menu.Items);
+        }
+
+        // No margin for check marks (the checked entry has a bar on its edge): the text starts a little in from the edge.
+        private void PadItems(ToolStripItemCollection items)
+        {
+            int left = (int)(10 * menu.DeviceDpi / 96f);
+            foreach (ToolStripItem item in items)
+            {
+                if (item is ToolStripSeparator)
+                    continue;
+                item.Padding = new Padding(left, item.Padding.Top, item.Padding.Right, item.Padding.Bottom);
+                if (item is ToolStripDropDownItem dropDown)
+                    PadItems(dropDown.DropDownItems);
+            }
         }
 
         protected override void ExitThreadCore()
@@ -1101,6 +1116,8 @@ namespace Muter.UI
             var item = new ToolStripMenuItem(text);
             item.DropDown.Font = menuFont;
             item.DropDown.Renderer = menu.Renderer;
+            if (item.DropDown is ToolStripDropDownMenu dropDownMenu)
+                dropDownMenu.ShowCheckMargin = false;
             return item;
         }
 

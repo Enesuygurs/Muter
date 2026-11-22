@@ -105,7 +105,7 @@ namespace Muter.UI
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
 
-            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer(), ShowCheckMargin = false, ShowImageMargin = false };
+            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer(), ShowCheckMargin = false };
             menu.Opening += (s, e) =>
             {
                 RebuildMenu();
@@ -1117,10 +1117,7 @@ namespace Muter.UI
             item.DropDown.Font = menuFont;
             item.DropDown.Renderer = menu.Renderer;
             if (item.DropDown is ToolStripDropDownMenu dropDownMenu)
-            {
                 dropDownMenu.ShowCheckMargin = false;
-                dropDownMenu.ShowImageMargin = false;
-            }
             return item;
         }
 

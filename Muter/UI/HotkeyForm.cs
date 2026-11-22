@@ -40,6 +40,15 @@ namespace Muter.UI
         private readonly Hotkey currentHotkey;
         private readonly Hotkey defaultHotkey;
         private Hotkey? candidate;
+        private readonly Label statusGlyph = new Label
+        {
+            AutoSize = false,
+            Size = new Size(16, 20),
+            Font = new Font(Theme.IconFontFamily, 10F),
+            TextAlign = ContentAlignment.TopCenter,
+            UseMnemonic = false,
+        };
+        private int footerTop;
 
         #endregion
 
@@ -60,6 +69,9 @@ namespace Muter.UI
                 titleLabel.Text = title;
             if (description != null)
                 descriptionLabel.Text = description;
+            Controls.Add(statusGlyph);
+            FormClosed += (s, e) => statusGlyph.Font.Dispose();
+            LayoutDialog();
             this.applyHotkey = applyHotkey ?? throw new ArgumentNullException(nameof(applyHotkey));
             this.currentHotkey = currentHotkey;
             Icon = AppResources.AppIcon;
@@ -90,6 +102,48 @@ namespace Muter.UI
             cancelButton.Left = saveButton.Left - 8 - cancelButton.Width;
             int needed = TextRenderer.MeasureText(resetButton.Text, resetButton.Font).Width + 12;
             resetButton.Width = Math.Min(cancelButton.Left - resetButton.Left - 8, Math.Max(resetButton.Width, needed));
+        }
+
+        // Height of the longest status message in this language, with a long combination in it.
+        private int LongestStatusHeight()
+        {
+            Strings text = Strings.Current;
+            string longKey = HotkeyText.Format(new Hotkey(Keys.PageDown, HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.Shift));
+            int height = 0;
+            foreach (string message in new[]
+            {
+                text.HotkeyIsCurrent, text.HotkeyCurrent, text.HotkeyPending, text.HotkeyInvalidKey, text.HotkeyChooseValid,
+                string.Format(text.HotkeyPressSave, longKey), string.Format(text.HotkeyExample, longKey),
+                string.Format(text.HotkeyReserved, longKey), string.Format(text.HotkeyNeedsCtrlOrAlt, longKey),
+                string.Format(text.HotkeyTaken, longKey),
+            })
+            {
+                height = Math.Max(height, TextRenderer.MeasureText(message, statusLabel.Font, new Size(statusLabel.Width, int.MaxValue),
+                    TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + statusLabel.Padding.Vertical);
+            }
+            return height;
+        }
+
+        // Stacks the dialog for the description's height: description, capture area (96), status line, footer band (64).
+        private void LayoutDialog()
+        {
+            float s = DeviceDpi / 96f;
+            int descriptionHeight = TextRenderer.MeasureText(descriptionLabel.Text, descriptionLabel.Font, new Size(descriptionLabel.Width, int.MaxValue),
+                TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
+            descriptionLabel.Height = descriptionHeight;
+            statusLabel.Height = Math.Max((int)(34 * s), LongestStatusHeight());
+            captureBox.Top = descriptionLabel.Bottom + (int)(16 * s);
+            statusLabel.Top = captureBox.Bottom + (int)(12 * s);
+            statusGlyph.Location = new Point(captureBox.Left, statusLabel.Top + (int)(1 * s));
+            footerTop = statusLabel.Bottom + (int)(20 * s);
+            int footerHeight = (int)(64 * s);
+            int buttonTop = footerTop + (footerHeight - saveButton.Height) / 2;
+            saveButton.Top = cancelButton.Top = buttonTop;
+            resetButton.Top = buttonTop + (saveButton.Height - resetButton.Height) / 2;
+            foreach (FlatButton button in new[] { saveButton, cancelButton, resetButton })
+                button.BackColor = Theme.DialogFooter;
+            ClientSize = new Size(ClientSize.Width, footerTop + footerHeight);
+            Invalidate();
         }
 
         // Test access.
@@ -238,7 +292,9 @@ namespace Muter.UI
         {
             captureBox.State = state;
             statusLabel.Text = message;
-            statusLabel.ForeColor = state == KeyCaptureState.Invalid ? Theme.Error : Theme.TextSecondary;
+            statusLabel.ForeColor = state == KeyCaptureState.Invalid ? Theme.Error : state == KeyCaptureState.Valid ? Theme.TextPrimary : Theme.TextSecondary;
+            statusGlyph.Text = state == KeyCaptureState.Invalid ? "\uE783" : state == KeyCaptureState.Valid ? "\uE73E" : "\uE946";
+            statusGlyph.ForeColor = state == KeyCaptureState.Invalid ? Theme.Error : state == KeyCaptureState.Valid ? Theme.Success : Theme.TextSecondary;
             saveButton.Enabled = canSave;
         }
 
@@ -286,7 +342,11 @@ namespace Muter.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using (var pen = new Pen(Theme.Border))
+            using (var footer = new SolidBrush(Theme.DialogFooter))
+                e.Graphics.FillRectangle(footer, 0, footerTop, ClientSize.Width, ClientSize.Height - footerTop);
+            using (var line = new SolidBrush(Theme.Border))
+                e.Graphics.FillRectangle(line, 0, footerTop, ClientSize.Width, 1);
+            using (var pen = new Pen(Theme.WindowBorder))
                 e.Graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
         }
 

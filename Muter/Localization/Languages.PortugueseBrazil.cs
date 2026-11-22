@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Um som curto ao ligar ou silenciar o microfone",
             ShowOverlay = "Mostrar overlay",
             ShowOverlayHint = "Aparece quando o microfone é ligado ou silenciado",
+            SectionPreview = "Pré-visualização",
+            ShowNow = "Mostrar agora",
             Position = "Posição",
             PositionHint = "Escolha Personalizada para arrastar",
             Size = "Tamanho",

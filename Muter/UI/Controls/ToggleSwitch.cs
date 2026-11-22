@@ -6,12 +6,12 @@ using System.Windows.Forms;
 
 namespace Muter.UI.Controls
 {
-    // iOS-style switch: a pill-shaped track with a white knob that slides (animated) between off and on.
+    // A 40 x 20 pill switch. On: accent track with a small dark knob on the right. Off: an outlined track with a grey
+    // knob on the left. The knob slides (animated). The control is 2 px larger on every side for the focus ring.
     public class ToggleSwitch : Control
     {
         private const int AnimationMs = 150;
-        private static readonly Color OffTrack = Color.FromArgb(72, 72, 76);
-        private static readonly Color OffTrackHover = Color.FromArgb(84, 84, 88);
+        private static readonly Color OffHover = Color.FromArgb(0x95, 0x9C, 0xA6);
 
         private readonly Timer animation = new Timer { Interval = 15 };
         private bool isChecked;
@@ -26,7 +26,7 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.SupportsTransparentBackColor, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);
             BackColor = Theme.Surface;
-            Size = new Size(50, 30);
+            Size = new Size(44, 24);
             animation.Tick += (s, e) => Animate();
         }
 
@@ -136,37 +136,31 @@ namespace Muter.UI.Controls
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             float s = DeviceDpi / 96f;
 
-            // Room around the track for the focus ring.
-            float inset = 2 * s;
-            var track = new RectangleF(inset, inset, Width - 2 * inset, Height - 2 * inset);
+            var track = new RectangleF(2 * s, 2 * s, Width - 4 * s, Height - 4 * s);
             float radius = track.Height / 2;
-            int alpha = Enabled ? 255 : 110;
+            Color off = !Enabled ? Theme.DisabledText : hover ? OffHover : Theme.SwitchOff;
+            Color on = !Enabled ? Theme.DisabledFill : hover ? Theme.AccentHover : Theme.Accent;
 
-            Color off = hover && Enabled ? OffTrackHover : OffTrack;
-            Color on = hover && Enabled ? Theme.AccentHover : Theme.Accent;
-            Color trackColor = Blend(off, on, position);
-            using (GraphicsPath path = Theme.RoundedRectangle(track, radius))
-            using (var fill = new SolidBrush(Color.FromArgb(alpha, trackColor)))
-                g.FillPath(fill, path);
-
-            // Knob: a white circle with a soft shadow, sliding along the track.
-            float margin = 2.5f * s;
-            float knob = track.Height - 2 * margin;
-            float travel = track.Width - 2 * margin - knob;
-            float x = track.Left + margin + travel * position;
-            float y = track.Top + margin;
-            for (int i = 3; i >= 1; i--)
+            // Off track (outline) fades into the filled on track.
+            Theme.FillBox(g, track, radius, BackColor, off, s);
+            if (position > 0)
             {
-                using (var shadow = new SolidBrush(Color.FromArgb(alpha * 22 / 255, 0, 0, 0)))
-                    g.FillEllipse(shadow, x - i * 0.5f * s, y - i * 0.25f * s + s, knob + i * s, knob + i * s);
+                using (GraphicsPath path = Theme.RoundedRectangle(track, radius))
+                using (var fill = new SolidBrush(Color.FromArgb((int)(255 * position), on)))
+                    g.FillPath(fill, path);
             }
-            using (var knobBrush = new SolidBrush(Color.FromArgb(alpha, 255, 255, 255)))
-                g.FillEllipse(knobBrush, x, y, knob, knob);
+
+            // Knob: 10 px grey when off, 12 px dark when on; its centre slides from 10 px to (width - 10 px).
+            float knob = (10 + 2 * position) * s;
+            float cx = track.Left + track.Height / 2 + (track.Width - track.Height) * position;
+            float cy = track.Top + track.Height / 2;
+            using (var brush = new SolidBrush(Blend(off, Enabled ? Theme.SwitchKnob : Theme.DisabledText, position)))
+                g.FillEllipse(brush, cx - knob / 2, cy - knob / 2, knob, knob);
 
             if (Focused && ShowFocusCues)
             {
-                using (GraphicsPath ring = Theme.RoundedRectangle(new RectangleF(0.75f * s, 0.75f * s, Width - 1.5f * s - 1, Height - 1.5f * s - 1), Height / 2f))
-                using (var pen = new Pen(Theme.TextPrimary, 1.25f * s))
+                using (GraphicsPath ring = Theme.RoundedRectangle(new RectangleF(0.5f * s, 0.5f * s, Width - 1f * s, Height - 1f * s), Height / 2f))
+                using (var pen = new Pen(Theme.TextPrimary, s))
                     g.DrawPath(pen, ring);
             }
         }

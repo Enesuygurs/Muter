@@ -1,22 +1,31 @@
+using System;
 using System.ComponentModel;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace Muter.UI.Controls
 {
-    // A settings "card": title and optional description on the left, the control on the right.
+    // A row of a settings card: the label and an optional hint (wrapped) on the left, the control on the right. The
+    // card places rows 8 px in from its edges, so the row's own 8 px padding puts everything 16 px from the card edge.
     public class SettingRow : Panel
     {
+        internal const int Inset = 8;
+        private const int MinHeight = 56;
+        private const int ControlGap = 16;
+        private const TextFormatFlags TitleFlags = TextFormatFlags.Left | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+        private const TextFormatFlags HintFlags = TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+
         private string title = string.Empty;
         private string description = string.Empty;
+        private Color descriptionColor = Color.Empty;
         private Control setting;
+        private Font hintFont;
 
         public SettingRow()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            BackColor = Theme.Background;
-            Size = new Size(440, 56);
+            BackColor = Theme.Surface;
+            Size = new Size(476, MinHeight);
         }
 
         [DefaultValue("")]
@@ -36,7 +45,24 @@ namespace Muter.UI.Controls
             get => description;
             set
             {
-                description = value ?? string.Empty;
+                value = value ?? string.Empty;
+                if (description == value)
+                    return;
+                description = value;
+                Invalidate();
+                Parent?.PerformLayout(); // the height may change
+            }
+        }
+
+        // The hint colour; Color.Empty is the normal secondary text colour.
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color DescriptionColor
+        {
+            get => descriptionColor;
+            set
+            {
+                descriptionColor = value;
                 Invalidate();
             }
         }
@@ -61,6 +87,38 @@ namespace Muter.UI.Controls
             }
         }
 
+        internal Font HintFont => hintFont ?? (hintFont = new Font(Font.FontFamily, 9f));
+
+        private float DpiScale => DeviceDpi / 96f;
+
+        // The width the label and the hint may use.
+        internal int TextWidth => (setting != null ? setting.Left - (int)(ControlGap * DpiScale) : Width - (int)(Inset * DpiScale)) - (int)(Inset * DpiScale);
+
+        // Height for the current width: at least 56 px, more when the hint wraps.
+        internal int PreferredRowHeight()
+        {
+            float s = DpiScale;
+            PlaceSetting();
+            int textHeight = TextHeight(out _, out _);
+            int controlHeight = setting?.Height ?? 0;
+            return Math.Max((int)(MinHeight * s), Math.Max(textHeight + (int)(22 * s), controlHeight + (int)(24 * s)));
+        }
+
+        private int TextHeight(out int titleHeight, out int hintHeight)
+        {
+            int width = Math.Max(1, TextWidth);
+            titleHeight = TextRenderer.MeasureText(title.Length == 0 ? " " : title, Font, new Size(width, int.MaxValue), TitleFlags).Height;
+            hintHeight = description.Length == 0 ? 0 : TextRenderer.MeasureText(description, HintFont, new Size(width, int.MaxValue), HintFlags).Height;
+            return titleHeight + (hintHeight > 0 ? (int)(2 * DpiScale) + hintHeight : 0);
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            hintFont?.Dispose();
+            hintFont = null;
+            base.OnFontChanged(e);
+        }
+
         protected override void OnLayout(LayoutEventArgs levent)
         {
             base.OnLayout(levent);
@@ -71,41 +129,31 @@ namespace Muter.UI.Controls
         {
             if (setting == null)
                 return;
-            int margin = (int)(16 * DeviceDpi / 96f);
-            setting.Location = new Point(Width - margin - setting.Width, (Height - setting.Height) / 2);
+            var location = new Point(Width - (int)(Inset * DpiScale) - setting.Width, (Height - setting.Height) / 2);
+            if (setting.Location != location)
+                setting.Location = location;
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
-            float s = DeviceDpi / 96f;
-            using (GraphicsPath path = Theme.RoundedRectangle(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), 6 * s))
-            using (var fill = new SolidBrush(Theme.Surface))
-            using (var pen = new Pen(Color.FromArgb(52, 52, 52), s))
+            int left = (int)(Inset * DpiScale);
+            int width = Math.Max(1, TextWidth);
+            int total = TextHeight(out int titleHeight, out int hintHeight);
+            int top = (Height - total) / 2;
+            TextRenderer.DrawText(g, title, Font, new Rectangle(left, top, width, titleHeight), Theme.TextPrimary, Theme.Surface, TitleFlags);
+            if (hintHeight > 0)
             {
-                g.FillPath(fill, path);
-                g.DrawPath(pen, path);
+                TextRenderer.DrawText(g, description, HintFont, new Rectangle(left, top + titleHeight + (int)(2 * DpiScale), width, hintHeight),
+                    descriptionColor.IsEmpty ? Theme.TextSecondary : descriptionColor, Theme.Surface, HintFlags);
             }
+        }
 
-            int left = (int)(16 * s);
-            int right = setting != null ? setting.Left - (int)(12 * s) : Width - left;
-            using (var titleFont = new Font(Font.FontFamily, Font.SizeInPoints, FontStyle.Regular))
-            using (var descriptionFont = new Font(Font.FontFamily, Font.SizeInPoints * 0.88f))
-            {
-                const TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
-                if (description.Length == 0)
-                {
-                    TextRenderer.DrawText(g, title, titleFont, new Rectangle(left, 0, right - left, Height), Theme.TextPrimary, flags | TextFormatFlags.VerticalCenter);
-                    return;
-                }
-                int titleHeight = TextRenderer.MeasureText(g, title, titleFont, Size.Empty, flags).Height;
-                int descriptionHeight = TextRenderer.MeasureText(g, description, descriptionFont, Size.Empty, flags).Height;
-                int top = (Height - titleHeight - descriptionHeight - (int)(2 * s)) / 2;
-                TextRenderer.DrawText(g, title, titleFont, new Rectangle(left, top, right - left, titleHeight), Theme.TextPrimary, flags);
-                TextRenderer.DrawText(g, description, descriptionFont, new Rectangle(left, top + titleHeight + (int)(2 * s), right - left, descriptionHeight), Theme.TextSecondary, flags);
-            }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                hintFont?.Dispose();
+            base.Dispose(disposing);
         }
     }
 }

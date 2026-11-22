@@ -136,17 +136,20 @@ namespace Muter.UI.Controls
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float scale = DeviceDpi / 96f;
-            var bounds = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             Color text;
 
+            float radius = 6 * scale;
             switch (buttonStyle)
             {
                 case FlatButtonStyle.Primary:
-                    Color fill = !Enabled ? Theme.AccentDisabled : pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent;
-                    using (GraphicsPath path = Theme.RoundedRectangle(bounds, 5 * scale))
-                    using (var brush = new SolidBrush(fill))
-                        g.FillPath(brush, path);
-                    text = Enabled ? Theme.AccentText : Theme.TextDisabled;
+                    if (!Enabled)
+                    {
+                        Theme.Fill(g, ClientRectangle, radius, Theme.DisabledFill);
+                        text = Theme.DisabledText;
+                        break;
+                    }
+                    Theme.Fill(g, ClientRectangle, radius, pressed ? Theme.AccentPressed : hover ? Theme.AccentHover : Theme.Accent);
+                    text = Theme.AccentText;
                     break;
 
                 case FlatButtonStyle.Close:
@@ -159,19 +162,18 @@ namespace Muter.UI.Controls
                     break;
 
                 case FlatButtonStyle.Link:
-                    text = !Enabled ? Theme.TextDisabled : hover ? Theme.AccentHover : Theme.Accent;
+                    text = !Enabled ? Theme.TextDisabled : hover ? Theme.AccentHover : Theme.Link;
                     break;
 
                 default:
-                    Color background = !Enabled ? Theme.Background : pressed ? Theme.ButtonPressed : hover ? Theme.ButtonHover : Theme.ButtonFill;
-                    using (GraphicsPath path = Theme.RoundedRectangle(bounds, 5 * scale))
-                    using (var brush = new SolidBrush(background))
-                    using (var pen = new Pen(Theme.ButtonBorder))
+                    if (!Enabled)
                     {
-                        g.FillPath(brush, path);
-                        g.DrawPath(pen, path);
+                        Theme.Fill(g, ClientRectangle, radius, Theme.DisabledFill);
+                        text = Theme.DisabledText;
+                        break;
                     }
-                    text = Enabled ? Theme.TextPrimary : Theme.TextDisabled;
+                    Theme.FillBox(g, ClientRectangle, radius, pressed ? Theme.ButtonPressed : hover ? Theme.ButtonHover : Theme.ButtonFill, Theme.ButtonBorder, scale);
+                    text = Theme.TextPrimary;
                     break;
             }
 
@@ -179,17 +181,19 @@ namespace Muter.UI.Controls
             if (buttonStyle == FlatButtonStyle.Link)
                 flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
             Font font = Font;
-            Font underlined = null;
+            Font extra = null;
             if (buttonStyle == FlatButtonStyle.Link && hover && Enabled)
-                font = underlined = new Font(Font, FontStyle.Underline);
+                font = extra = new Font(Font, FontStyle.Underline);
+            else if (buttonStyle == FlatButtonStyle.Primary && Enabled && Font.Name == Theme.FontFamily)
+                font = extra = new Font(Theme.SemiboldFontFamily, Font.SizeInPoints);
             TextRenderer.DrawText(g, Text, font, ClientRectangle, text, flags);
-            underlined?.Dispose();
+            extra?.Dispose();
 
             // Keyboard focus ring (not drawn for mouse clicks).
             if (Focused && ShowFocusCues && buttonStyle != FlatButtonStyle.Close)
             {
-                using (GraphicsPath path = Theme.RoundedRectangle(new RectangleF(1.5f, 1.5f, Width - 3f, Height - 3f), 4 * scale))
-                using (var pen = new Pen(Theme.TextPrimary, 1.5f * scale))
+                using (GraphicsPath path = Theme.RoundedRectangle(new RectangleF(1.5f * scale, 1.5f * scale, Width - 3f * scale, Height - 3f * scale), 5 * scale))
+                using (var pen = new Pen(Theme.TextPrimary, scale))
                     g.DrawPath(pen, path);
             }
         }

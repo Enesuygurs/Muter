@@ -67,6 +67,19 @@ namespace Muter.UI.Controls
         [DefaultValue(false)]
         public bool Compact { get; set; }
 
+        // Width the compact keycaps need (at the current DPI).
+        public int CompactWidth()
+        {
+            const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+            float scale = DeviceDpi / 96f;
+            float capHeight = 28 * scale;
+            float total = 0;
+            foreach (string cap in keycaps)
+                total += Math.Max(capHeight, TextRenderer.MeasureText(cap, Font, Size.Empty, flags).Width + 16 * scale);
+            total += Math.Max(0, keycaps.Count - 1) * 16 * scale;
+            return (int)Math.Ceiling(total) + 1;
+        }
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             Focus();
@@ -103,17 +116,11 @@ namespace Muter.UI.Controls
             }
 
             Color border = state == KeyCaptureState.Invalid ? Theme.ErrorBorder
-                : state == KeyCaptureState.Valid || state == KeyCaptureState.Pending || Focused ? Theme.Accent
-                : Theme.Border;
-            float borderWidth = (state == KeyCaptureState.Idle && !Focused ? 1f : 2f) * scale;
-            var bounds = new RectangleF(borderWidth / 2, borderWidth / 2, Width - borderWidth, Height - borderWidth);
-            using (GraphicsPath path = Theme.RoundedRectangle(bounds, 8 * scale))
-            using (var fill = new SolidBrush(Theme.Surface))
-            using (var pen = new Pen(border, borderWidth))
-            {
-                g.FillPath(fill, path);
-                g.DrawPath(pen, path);
-            }
+                : state == KeyCaptureState.Valid || state == KeyCaptureState.Pending ? Theme.Accent
+                : Focused ? Theme.SegmentSelectedBorder
+                : Theme.ButtonBorder;
+            float borderWidth = (state == KeyCaptureState.Idle ? 1f : 2f) * scale;
+            Theme.FillBox(g, ClientRectangle, 8 * scale, Theme.Inset, border, borderWidth);
 
             if (caps.Count == 0)
             {
@@ -124,14 +131,14 @@ namespace Muter.UI.Controls
             DrawKeycaps(g, caps, scale);
         }
 
+        // Keycaps: fill with a 1 px border and a 2 px darker bottom edge, joined by a "+" in a 16 px (26 px large) slot.
         private void DrawKeycaps(Graphics g, List<string> caps, float scale)
         {
             const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+            float capHeight = (Compact ? 28 : 36) * scale;
             float padding = (Compact ? 8 : 12) * scale;
-            float gap = (Compact ? 5 : 8) * scale;
-            float depth = 3 * scale;
-            float capHeight = Compact ? Height - depth - 1 : Math.Min(Height - 20 * scale, Font.Height + 16 * scale);
-            Size plusSize = TextRenderer.MeasureText(g, "+", Font, Size.Empty, flags);
+            float plusWidth = (Compact ? 16 : 26) * scale;
+            float edge = 2 * scale;
 
             var widths = new List<float>();
             float total = 0;
@@ -141,40 +148,41 @@ namespace Muter.UI.Controls
                 widths.Add(width);
                 total += width;
             }
-            total += (caps.Count - 1) * (plusSize.Width + 2 * gap);
+            total += (caps.Count - 1) * plusWidth;
 
             // Shrink the caps if a long combination would not fit.
             float available = Compact ? Width - 1 : Width - 24 * scale;
             float shrink = total > available ? available / total : 1f;
-            float x = Compact ? Width - 1 - total * shrink : (Width - total * shrink) / 2;
-            float top = (Height - capHeight - depth) / 2;
+            float x = Compact ? Width - total * shrink : (Width - total * shrink) / 2;
+            float top = (float)Math.Floor((Height - capHeight) / 2);
 
             for (int i = 0; i < caps.Count; i++)
             {
                 float width = widths[i] * shrink;
                 var cap = new RectangleF(x, top, width, capHeight);
+                var face = new RectangleF(cap.X, cap.Y, cap.Width, cap.Height - edge);
                 bool placeholder = caps[i] == "…";
-                using (GraphicsPath shadow = Theme.RoundedRectangle(new RectangleF(cap.X, cap.Y + depth, cap.Width, cap.Height), 6 * scale))
-                using (var shadowBrush = new SolidBrush(Theme.KeycapShadow))
-                    g.FillPath(shadowBrush, shadow);
-                using (GraphicsPath path = Theme.RoundedRectangle(cap, 6 * scale))
-                using (var fill = new SolidBrush(placeholder ? Theme.Surface : Theme.KeycapFill))
-                using (var pen = new Pen(placeholder ? Theme.Accent : Theme.KeycapBorder, scale) { DashStyle = placeholder ? DashStyle.Dash : DashStyle.Solid })
+                if (placeholder)
                 {
-                    g.FillPath(fill, path);
-                    g.DrawPath(pen, path);
+                    using (GraphicsPath path = Theme.RoundedRectangle(new RectangleF(face.X + 0.5f, face.Y + 0.5f, face.Width - 1, face.Height - 1), 5 * scale))
+                    using (var pen = new Pen(Theme.Accent, scale) { DashStyle = DashStyle.Dash })
+                        g.DrawPath(pen, path);
                 }
-                TextRenderer.DrawText(g, caps[i], Font, Rectangle.Round(cap), placeholder ? Theme.TextSecondary : Theme.TextPrimary,
+                else
+                {
+                    Theme.Fill(g, cap, 5 * scale, Theme.KeycapShadow);
+                    Theme.FillBox(g, face, 5 * scale, Theme.KeycapFill, Theme.KeycapBorder, scale);
+                }
+                TextRenderer.DrawText(g, caps[i], Font, Rectangle.Round(face), placeholder ? Theme.TextSecondary : Theme.TextPrimary,
                     flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 x += width;
 
                 if (i < caps.Count - 1)
                 {
-                    x += gap * shrink;
-                    var plus = new RectangleF(x, top, plusSize.Width * shrink, capHeight);
-                    TextRenderer.DrawText(g, "+", Font, Rectangle.Round(plus), Theme.TextSecondary,
+                    var plus = new RectangleF(x, top, plusWidth * shrink, capHeight - edge);
+                    TextRenderer.DrawText(g, "+", Font, Rectangle.Round(plus), Theme.TextDisabled,
                         flags | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                    x += (plusSize.Width + gap) * shrink;
+                    x += plusWidth * shrink;
                 }
             }
         }

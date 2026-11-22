@@ -3,53 +3,118 @@ using System.Drawing.Drawing2D;
 
 namespace Muter.UI.Controls
 {
-    // Dark theme shared by Muter's windows; the accent is the green of the app icon.
+    // The flat dark theme shared by Muter's windows (design tokens). The accent is the green of the app icon.
     internal static class Theme
     {
-        public static readonly Color Background = Color.FromArgb(31, 31, 31);
-        public static readonly Color Surface = Color.FromArgb(43, 43, 43);
-        public static readonly Color Border = Color.FromArgb(61, 61, 61);
-        public static readonly Color TextPrimary = Color.FromArgb(243, 243, 243);
-        public static readonly Color TextSecondary = Color.FromArgb(167, 167, 167);
-        public static readonly Color TextDisabled = Color.FromArgb(110, 110, 110);
+        public static readonly Color Background = Hex(0x14161A);   // window, title bar, navigation
+        public static readonly Color Surface = Hex(0x1C1F25);      // cards
+        public static readonly Color Border = Hex(0x262A31);       // card border, dividers
+        public static readonly Color WindowBorder = Hex(0x2C3038);
+        public static readonly Color TextPrimary = Hex(0xE8EAED);
+        public static readonly Color TextSecondary = Hex(0xA0A6B0); // hints, section headers
+        public static readonly Color TextDisabled = Hex(0x6E7581);  // footer, "+" between keys
 
-        public static readonly Color Accent = Color.FromArgb(56, 182, 41);
-        public static readonly Color AccentHover = Color.FromArgb(67, 201, 52);
-        public static readonly Color AccentPressed = Color.FromArgb(47, 156, 34);
-        public static readonly Color AccentText = Color.FromArgb(10, 30, 8);
-        public static readonly Color AccentDisabled = Color.FromArgb(44, 58, 42);
+        public static readonly Color Accent = Hex(0x22C55E);
+        public static readonly Color AccentHover = Hex(0x34D06E);
+        public static readonly Color AccentPressed = Hex(0x1DAE52);
+        public static readonly Color AccentText = Hex(0x052E16);    // text on accent
+        public static readonly Color Link = Hex(0x4ADE80);
+        public static readonly Color Success = Hex(0x4ADE80);
 
-        public static readonly Color Error = Color.FromArgb(241, 112, 123);
-        public static readonly Color ErrorBorder = Color.FromArgb(229, 72, 77);
+        public static readonly Color Error = Hex(0xF87171);
+        public static readonly Color ErrorBorder = Hex(0xF87171);
 
-        public static readonly Color ButtonFill = Color.FromArgb(48, 48, 48);
-        public static readonly Color ButtonHover = Color.FromArgb(58, 58, 58);
-        public static readonly Color ButtonPressed = Color.FromArgb(40, 40, 40);
-        public static readonly Color ButtonBorder = Color.FromArgb(72, 72, 72);
+        public static readonly Color ButtonFill = Hex(0x252930);    // controls: buttons, dropdowns
+        public static readonly Color ButtonHover = Hex(0x2B3038);
+        public static readonly Color ButtonPressed = Hex(0x20242A);
+        public static readonly Color ButtonBorder = Hex(0x353A44);
+        public static readonly Color DisabledFill = Hex(0x22252B);
+        public static readonly Color DisabledText = Hex(0x5B616C);
+        public static readonly Color AccentDisabled = DisabledFill;
         public static readonly Color CloseHover = Color.FromArgb(196, 43, 28);
 
-        public static readonly Color KeycapFill = Color.FromArgb(62, 62, 62);
-        public static readonly Color KeycapBorder = Color.FromArgb(84, 84, 84);
-        public static readonly Color KeycapShadow = Color.FromArgb(22, 22, 22);
+        public static readonly Color NavSelected = Hex(0x22262D);
+        public static readonly Color MenuHover = Hex(0x2B3038);
+        public static readonly Color Popup = Hex(0x20242A);
+        public static readonly Color PopupBorder = Hex(0x363B45);
+        public static readonly Color Inset = Hex(0x101216);         // hotkey capture area
+        public static readonly Color SegmentTrack = Hex(0x14161A);
+        public static readonly Color SegmentSelected = Hex(0x32373F);
+        public static readonly Color SegmentSelectedBorder = Hex(0x3E4450);
+        public static readonly Color SwitchOff = Hex(0x7A818C);
+        public static readonly Color SwitchKnob = Hex(0x0B1F12);
+        public static readonly Color DialogFooter = Hex(0x181A1F);
 
+        public static readonly Color KeycapFill = Hex(0x2A2E36);
+        public static readonly Color KeycapBorder = Hex(0x3D434E);
+        public static readonly Color KeycapShadow = Hex(0x0C0E11);  // the darker bottom edge
+
+        // Microphone states: fill, ink on the fill, text on a dark panel.
+        public static readonly Color LiveFill = Hex(0x22C55E), LiveInk = Hex(0x052E16), LiveText = Hex(0x4ADE80);
+        public static readonly Color MutedFill = Hex(0xEF4444), MutedInk = Hex(0xFFFFFF), MutedText = Hex(0xF87171);
+        public static readonly Color NoDeviceFill = Hex(0x4B5563), NoDeviceInk = Hex(0xE5E7EB), NoDeviceText = Hex(0xA3AAB5), NoDeviceRing = Hex(0x6B7280);
+        public static readonly Color UnknownFill = Hex(0xF59E0B), UnknownInk = Hex(0x2A1800), UnknownText = Hex(0xFBBF24);
+        public static readonly Color OverlayPanel = Hex(0x15171C);
+
+        // Overlay/mini indicator frame while it can be dragged (not a state colour).
+        public static readonly Color MoveFrame = Hex(0x60A5FA);
+
+        public const string FontFamily = "Segoe UI";
         public const string SemiboldFontFamily = "Segoe UI Semibold";
         public const string IconFontFamily = "Segoe MDL2 Assets";
+
+        private static Color Hex(int rgb) => Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 
         public static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
         {
             var path = new GraphicsPath();
-            float d = radius * 2;
-            if (d <= 0 || bounds.Width < d || bounds.Height < d)
+            if (radius <= 0.01f)
             {
                 path.AddRectangle(bounds);
                 return path;
             }
+            float d = System.Math.Min(radius * 2, System.Math.Min(bounds.Width, bounds.Height));
             path.AddArc(bounds.Left, bounds.Top, d, d, 180, 90);
             path.AddArc(bounds.Right - d, bounds.Top, d, d, 270, 90);
             path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
             path.AddArc(bounds.Left, bounds.Bottom - d, d, d, 90, 90);
             path.CloseFigure();
             return path;
+        }
+
+        // A filled rounded rectangle with a border of the given width (fill drawn inside the border).
+        public static void FillBox(Graphics g, RectangleF r, float radius, Color fill, Color border, float borderWidth = 1)
+        {
+            using (var path = RoundedRectangle(r, radius))
+            using (var brush = new SolidBrush(border))
+                g.FillPath(brush, path);
+            r.Inflate(-borderWidth, -borderWidth);
+            using (var path = RoundedRectangle(r, System.Math.Max(0, radius - borderWidth)))
+            using (var brush = new SolidBrush(fill))
+                g.FillPath(brush, path);
+        }
+
+        public static Color StateFill(Muter.UI.StatusVisual visual) =>
+            visual == Muter.UI.StatusVisual.Live ? LiveFill : visual == Muter.UI.StatusVisual.Muted ? MutedFill
+            : visual == Muter.UI.StatusVisual.NoDevice ? NoDeviceFill : UnknownFill;
+
+        public static Color StateInk(Muter.UI.StatusVisual visual) =>
+            visual == Muter.UI.StatusVisual.Live ? LiveInk : visual == Muter.UI.StatusVisual.Muted ? MutedInk
+            : visual == Muter.UI.StatusVisual.NoDevice ? NoDeviceInk : UnknownInk;
+
+        public static Color StateText(Muter.UI.StatusVisual visual) =>
+            visual == Muter.UI.StatusVisual.Live ? LiveText : visual == Muter.UI.StatusVisual.Muted ? MutedText
+            : visual == Muter.UI.StatusVisual.NoDevice ? NoDeviceText : UnknownText;
+
+        // The ring/edge around a state surface (No device gets a lighter ring than its fill).
+        public static Color StateRing(Muter.UI.StatusVisual visual) =>
+            visual == Muter.UI.StatusVisual.NoDevice ? NoDeviceRing : StateFill(visual);
+
+        public static void Fill(Graphics g, RectangleF r, float radius, Color fill)
+        {
+            using (var path = RoundedRectangle(r, radius))
+            using (var brush = new SolidBrush(fill))
+                g.FillPath(brush, path);
         }
     }
 }

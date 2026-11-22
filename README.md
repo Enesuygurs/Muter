@@ -42,8 +42,8 @@ Right-click the tray icon to switch between microphones (**Devices**) or to open
 |---|---|
 | **General** | **Microphones**: **Default (System)** controls the default recording device *and* the default communications device (call apps often use the latter); **All Devices** controls every microphone; or pick a single one. **Keep in sync** keeps every controlled microphone in the same state, even when one is changed elsewhere (e.g. in Windows sound settings). **Start with Windows**. **Screen**: the monitor for the overlay and the mini indicator, and **Positions** (Move lets you drag both windows anywhere, Reset puts them back; a dragged window stays on the monitor it was dropped on). **Tray icon**: **Discreet icon** shows a plain microphone in the taskbar's colours (white on a dark taskbar, black on a light one) instead of green and red. **Language**: the Windows language or one of the 14 languages; the change applies immediately. |
 | **Hotkey** | **Mute hotkey**: press a new key combination and choose Save. Combinations that would block typing in other apps (such as `Shift + F`) are not accepted, and if another application already uses a combination, Muter tells you and keeps the old one. **Push to talk**: hold the hotkey to talk; when you let go (or when the key can no longer be seen, e.g. on a locked screen) the microphones are muted again. Turning it on mutes the microphones. **Active app**: **Mute the active app** turns on a second hotkey (**App hotkey**, chosen the same way) that mutes or unmutes the sound of the app in front; press it again to bring the sound back. The two hotkeys cannot be the same. **Sound feedback** on or off. |
-| **Overlay** | Show overlay, position, size and display time. |
-| **Mini indicator** | Show it, position and size. |
+| **Overlay** | Show overlay, position, size and display time. A **Preview** shows where it appears; **Show now** shows the real overlay. |
+| **Mini indicator** | Show it, position and size, with a **Preview** of where it appears. |
 
 ### What the states mean
 

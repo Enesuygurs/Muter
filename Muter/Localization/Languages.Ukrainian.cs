@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Короткий звук під час увімкнення та вимкнення мікрофона",
             ShowOverlay = "Показувати оверлей",
             ShowOverlayHint = "З'являється під час увімкнення та вимкнення мікрофона",
+            SectionPreview = "Попередній перегляд",
+            ShowNow = "Показати",
             Position = "Розташування",
             PositionHint = "«Власне» — щоб перетягнути",
             Size = "Розмір",

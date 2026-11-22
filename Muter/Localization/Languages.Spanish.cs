@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Un sonido breve al activar o silenciar el micrófono",
             ShowOverlay = "Mostrar overlay",
             ShowOverlayHint = "Aparece al activar o silenciar el micrófono",
+            SectionPreview = "Vista previa",
+            ShowNow = "Mostrar ahora",
             Position = "Posición",
             PositionHint = "Elige Personalizada para arrastrarlo",
             Size = "Tamaño",

@@ -120,6 +120,8 @@ namespace Muter.Localization
         public string SoundFeedbackHint { get; set; }
         public string ShowOverlay { get; set; }
         public string ShowOverlayHint { get; set; }
+        public string SectionPreview { get; set; }
+        public string ShowNow { get; set; }
         public string Position { get; set; }
         public string PositionHint { get; set; }
         public string Size { get; set; }

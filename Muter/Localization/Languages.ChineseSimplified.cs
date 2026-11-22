@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "麦克风开启或静音时播放短促提示音",
             ShowOverlay = "显示悬浮窗",
             ShowOverlayHint = "麦克风开启或静音时出现",
+            SectionPreview = "预览",
+            ShowNow = "立即显示",
             Position = "位置",
             PositionHint = "选择“自定义”即可拖动",
             Size = "大小",

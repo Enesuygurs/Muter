@@ -97,10 +97,16 @@ namespace Muter.Tests
         public void Overlay_texts_fit_the_overlay(string code)
         {
             Strings language = Language(code);
-            using (var font = new Font("Segoe UI Semibold", 13.333f, FontStyle.Bold, GraphicsUnit.Pixel))
+            // Inside the 2 px ring and a 4 px margin of the 120 px overlay. The overlay shrinks a text that is too wide, but
+            // the state word must stay readable: it has to fit at 3/4 of its 16 px size.
+            const int width = 120 - 2 * 6;
+            using (var title = new Font("Segoe UI", 12f, GraphicsUnit.Pixel))
+            using (var state = new Font("Segoe UI Semibold", 12f, GraphicsUnit.Pixel))
             {
-                foreach (string text in new[] { language.Microphone, language.AllMicrophones, language.StateOn, language.StateOff, language.StateNoDevice, language.StateUnknown, language.DragToMove })
-                    Assert.True(TextRenderer.MeasureText(text, font).Width <= 122, $"{code}: \"{text}\" is wider than the overlay");
+                foreach (string text in new[] { language.Microphone, language.AllMicrophones, language.DragToMove })
+                    Assert.True(TextRenderer.MeasureText(text, title, Size.Empty, TextFormatFlags.NoPadding).Width <= width, $"{code}: \"{text}\" is wider than the overlay");
+                foreach (string text in new[] { language.StateOn, language.StateOff, language.StateNoDevice, language.StateUnknown })
+                    Assert.True(TextRenderer.MeasureText(text, state, Size.Empty, TextFormatFlags.NoPadding).Width <= width, $"{code}: \"{text}\" is wider than the overlay");
             }
         }
 
@@ -167,18 +173,17 @@ namespace Muter.Tests
             });
         }
 
+        // The label must fit on one line; the hint may wrap, but to two lines at most.
         private static void CheckRow(SettingRow row, List<string> problems)
         {
-            float s = row.DeviceDpi / 96f;
-            int available = (row.Setting != null ? row.Setting.Left - (int)(12 * s) : row.Width - (int)(16 * s)) - (int)(16 * s);
-            using (var title = new Font(row.Font.FontFamily, row.Font.SizeInPoints, FontStyle.Regular))
-            using (var description = new Font(row.Font.FontFamily, row.Font.SizeInPoints * 0.88f))
-            {
-                if (TextRenderer.MeasureText(row.Title, title, Size.Empty, RowFlags).Width > available)
-                    problems.Add($"title \"{row.Title}\"");
-                if (TextRenderer.MeasureText(row.Description, description, Size.Empty, RowFlags).Width > available)
-                    problems.Add($"hint \"{row.Description}\"");
-            }
+            int available = row.TextWidth;
+            if (TextRenderer.MeasureText(row.Title, row.Font, Size.Empty, RowFlags).Width > available)
+                problems.Add($"title \"{row.Title}\"");
+            int oneLine = TextRenderer.MeasureText("Ag", row.HintFont, Size.Empty, RowFlags).Height;
+            int hint = TextRenderer.MeasureText(row.Description, row.HintFont, new Size(available, int.MaxValue),
+                TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
+            if (hint > 2 * oneLine)
+                problems.Add($"hint \"{row.Description}\"");
         }
 
         [Theory]

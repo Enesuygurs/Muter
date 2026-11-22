@@ -249,7 +249,7 @@ namespace Muter.UI
         // No margin for check marks (the checked entry has a bar on its edge): the text starts a little in from the edge.
         private void PadItems(ToolStripItemCollection items)
         {
-            int left = (int)(10 * menu.DeviceDpi / 96f);
+            int left = (int)(8 * menu.DeviceDpi / 96f);
             foreach (ToolStripItem item in items)
             {
                 if (item is ToolStripSeparator)

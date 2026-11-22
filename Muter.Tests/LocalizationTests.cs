@@ -97,16 +97,10 @@ namespace Muter.Tests
         public void Overlay_texts_fit_the_overlay(string code)
         {
             Strings language = Language(code);
-            // Inside the 2 px ring and a 4 px margin of the 120 px overlay. The overlay shrinks a text that is too wide, but
-            // the state word must stay readable: it has to fit at 3/4 of its 16 px size.
-            const int width = 120 - 2 * 6;
-            using (var title = new Font("Segoe UI", 12f, GraphicsUnit.Pixel))
-            using (var state = new Font("Segoe UI Semibold", 12f, GraphicsUnit.Pixel))
+            using (var font = new Font("Segoe UI Semibold", 13.333f, FontStyle.Bold, GraphicsUnit.Pixel))
             {
-                foreach (string text in new[] { language.Microphone, language.AllMicrophones, language.DragToMove })
-                    Assert.True(TextRenderer.MeasureText(text, title, Size.Empty, TextFormatFlags.NoPadding).Width <= width, $"{code}: \"{text}\" is wider than the overlay");
-                foreach (string text in new[] { language.StateOn, language.StateOff, language.StateNoDevice, language.StateUnknown })
-                    Assert.True(TextRenderer.MeasureText(text, state, Size.Empty, TextFormatFlags.NoPadding).Width <= width, $"{code}: \"{text}\" is wider than the overlay");
+                foreach (string text in new[] { language.Microphone, language.AllMicrophones, language.StateOn, language.StateOff, language.StateNoDevice, language.StateUnknown, language.DragToMove })
+                    Assert.True(TextRenderer.MeasureText(text, font).Width <= 122, $"{code}: \"{text}\" is wider than the overlay");
             }
         }
 

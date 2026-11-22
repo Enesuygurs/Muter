@@ -137,15 +137,21 @@ namespace Muter.UI.Controls
                 if (forOverlay)
                 {
                     float k = 0.22f * factor * s;
-                    var box = new Size((int)Math.Round(StatusSurfaces.OverlayBaseSize.Width * k), (int)Math.Round(StatusSurfaces.OverlayBaseSize.Height * k));
+                    var box = new Size((int)Math.Round(122 * k), (int)Math.Round(151 * k));
                     Point at = Place(work, box, (int)(6 * s));
-                    StatusSurfaces.DrawOverlay(g, new RectangleF(at.X, at.Y, box.Width, box.Height), k, StatusVisual.Live, string.Empty, string.Empty, withText: false);
+                    var rect = new Rectangle(at, box);
+                    g.FillRectangle(Brushes.Black, rect);
+                    MicGlyph.Draw(g, new RectangleF(rect.X + rect.Width * 0.2f, rect.Y + rect.Height * 0.25f, rect.Width * 0.6f, rect.Height * 0.5f), Color.White, false, false, Color.Black);
                 }
                 else
                 {
                     int side = (int)Math.Round(9 * factor * s);
                     Point at = Place(work, new Size(side, side), (int)(6 * s));
-                    StatusSurfaces.DrawMini(g, new RectangleF(at.X, at.Y, side, side), StatusVisual.Live);
+                    int strip = Math.Max(1, side / 6);
+                    g.FillRectangle(Brushes.Black, at.X, at.Y, side, side);
+                    using (var green = new SolidBrush(Theme.LiveFill))
+                        g.FillRectangle(green, at.X, at.Y + side - strip, side, strip);
+                    MicGlyph.Draw(g, new RectangleF(at.X + 1, at.Y + 1, side - 2, side - strip - 2), Color.White, false, false, Color.Black);
                 }
             }
 

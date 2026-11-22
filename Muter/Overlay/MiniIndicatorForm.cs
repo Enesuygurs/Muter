@@ -1,14 +1,18 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 using Muter.UI;
-using Muter.UI.Controls;
 
 namespace Muter.Overlay
 {
-    // Small, permanently visible, click-through status square: a solid rounded square in the state colour with the
-    // microphone glyph (green = ON, red = OFF with a slash, grey outline = no device, amber = unknown).
+    // Small, permanently visible, click-through status square: microphone glyph with a colored strip
+    // (green = ON, red = OFF, gray = no device, amber = unknown).
     internal sealed class MiniIndicatorForm : OverlayWindow
     {
+        public static readonly Color LiveColor = Color.FromArgb(46, 204, 64);
+        public static readonly Color MutedColor = Color.FromArgb(231, 76, 60);
+        public static readonly Color NoDeviceColor = Color.FromArgb(140, 140, 140);
+        public static readonly Color UnknownColor = Color.FromArgb(243, 156, 18);
+
         private StatusPresentation presentation;
         private bool indicatorEnabled;
 
@@ -21,7 +25,7 @@ namespace Muter.Overlay
         public void SetPresentation(StatusPresentation value)
         {
             presentation = value;
-            Redraw();
+            Invalidate();
             ApplyVisibility();
         }
 
@@ -51,15 +55,37 @@ namespace Muter.Overlay
             ShowOnTop();
         }
 
-        protected override Color EdgeColor => MoveMode ? Theme.MoveFrame : Theme.StateRing(Presentation?.Visual ?? StatusVisual.Unknown);
+        public static Color ColorFor(StatusVisual visual)
+        {
+            switch (visual)
+            {
+                case StatusVisual.Live: return LiveColor;
+                case StatusVisual.Muted: return MutedColor;
+                case StatusVisual.NoDevice: return NoDeviceColor;
+                default: return UnknownColor;
+            }
+        }
 
-        protected override GraphicsPath Shape() => Theme.RoundedRectangle(new RectangleF(0, 0, Width, Height), StatusSurfaces.MiniRadius(Width));
-
-        protected override void Render(Graphics g)
+        protected override void OnPaint(PaintEventArgs e)
         {
             if (presentation == null)
                 return;
-            StatusSurfaces.DrawMini(g, new RectangleF(0, 0, Width, Height), presentation.Visual, MoveMode ? Theme.MoveFrame : (Color?)null);
+
+            Graphics g = e.Graphics;
+            Rectangle all = ClientRectangle;
+            int strip = Px(5 * RenderScale);
+            g.FillRectangle(Brushes.Black, all);
+            using (var brush = new SolidBrush(ColorFor(presentation.Visual)))
+                g.FillRectangle(brush, new Rectangle(0, all.Height - strip, all.Width, strip));
+
+            Image image = presentation.ShowsMuted ? AppResources.ImageMuted
+                : presentation.Visual == StatusVisual.NoDevice ? AppResources.ImageNoDevice
+                : AppResources.ImageLive;
+            int pad = Px(2 * RenderScale);
+            DrawImageFit(g, image, new Rectangle(pad, pad, all.Width - 2 * pad, all.Height - strip - 2 * pad));
+
+            if (MoveMode)
+                DrawMoveFrame(g);
         }
     }
 }

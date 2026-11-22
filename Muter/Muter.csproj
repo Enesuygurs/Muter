@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\*.ico" LogicalName="Muter.Resources.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Resources\*.ico;Resources\*.png" LogicalName="Muter.Resources.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

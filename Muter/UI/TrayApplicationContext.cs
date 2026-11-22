@@ -46,8 +46,7 @@ namespace Muter.UI
         private readonly MiniIndicatorForm miniIndicator;
         private readonly NotifyIcon trayIcon;
         private readonly ContextMenuStrip menu;
-        private readonly Font menuFont = new Font("Segoe UI", 9F);
-        private readonly Dictionary<string, Bitmap> menuGlyphs = new Dictionary<string, Bitmap>();
+        private readonly Font menuFont = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
         private readonly Timer pollTimer = new Timer { Interval = PollIntervalMs };
         private readonly SynchronizationContext uiContext;
         private readonly CloseRequestFilter closeRequestFilter;
@@ -106,7 +105,7 @@ namespace Muter.UI
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
 
-            menu = new ContextMenuStrip { Font = menuFont, Renderer = new DarkMenuRenderer() };
+            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer() };
             menu.Opening += (s, e) =>
             {
                 RebuildMenu();
@@ -240,32 +239,10 @@ namespace Muter.UI
         {
             DisposeItems(menu.Items);
 
-            ToolStripMenuItem devices = BuildDevicesMenu();
-            devices.Image = MenuGlyph("");
-            menu.Items.Add(devices);
-            ToolStripMenuItem settingsItem = Item(Strings.Current.MenuSettings, false, () => OpenSettings());
-            settingsItem.Image = MenuGlyph("");
-            menu.Items.Add(settingsItem);
+            menu.Items.Add(BuildDevicesMenu());
+            menu.Items.Add(Item(Strings.Current.MenuSettings, false, () => OpenSettings()));
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem exit = Item(Strings.Current.MenuExit, false, ExitThread);
-            exit.Image = MenuGlyph("");
-            menu.Items.Add(exit);
-
-            float scale = menu.DeviceDpi / 96f;
-            int glyph = (int)Math.Round(16 * scale);
-            menu.ImageScalingSize = new Size(glyph, glyph);
-            DarkMenuRenderer.SizeItems(menu, scale, (int)(24 * scale));
-            DarkMenuRenderer.SizeItems(devices.DropDown, scale, (int)(16 * scale));
-        }
-
-        // A Segoe MDL2 glyph as a menu image, cached for the menu's size.
-        private Bitmap MenuGlyph(string glyph)
-        {
-            int size = (int)Math.Round(16 * menu.DeviceDpi / 96f);
-            string key = glyph + "|" + size;
-            if (!menuGlyphs.TryGetValue(key, out Bitmap image))
-                menuGlyphs[key] = image = DarkMenuRenderer.GlyphImage(glyph, size, Theme.TextSecondary);
-            return image;
+            menu.Items.Add(Item(Strings.Current.MenuExit, false, ExitThread));
         }
 
         protected override void ExitThreadCore()
@@ -1152,7 +1129,6 @@ namespace Muter.UI
             {
                 if (item is ToolStripDropDownItem dropDown)
                     DisposeItems(dropDown.DropDownItems);
-                item.Image = null; // shared, cached glyph images
                 item.Dispose();
             }
         }
@@ -1225,8 +1201,6 @@ namespace Muter.UI
             miniIndicator.Dispose();
             pollTimer.Dispose();
             menuFont.Dispose();
-            foreach (Bitmap glyph in menuGlyphs.Values)
-                glyph.Dispose();
 
             if (realSounds)
                 FeedbackSounds.Release();

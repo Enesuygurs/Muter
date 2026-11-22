@@ -123,21 +123,7 @@ namespace Muter.UI.Controls
 
         protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle image = e.ImageRectangle;
-            float s = image.Height / 16f;
-            // Centred like the text, and moved right a little: at the margin's left edge it looks cut off from the text.
-            var box = new RectangleF(image.X + 5 * s, (e.Item.Height - image.Height) / 2f, image.Width, image.Height);
-            using (var pen = new Pen(Theme.Accent, 1.6f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
-            {
-                g.DrawLines(pen, new[]
-                {
-                    new PointF(box.Left + 3.5f * s, box.Top + 8.5f * s),
-                    new PointF(box.Left + 6.5f * s, box.Top + 11.5f * s),
-                    new PointF(box.Left + 12.5f * s, box.Top + 5f * s),
-                });
-            }
+            // The checked row is marked by its fill and accent pill only, without a check mark.
         }
 
         // An MDL2 glyph as a menu image (drawn with GDI+ anti-aliasing, which keeps the transparent background clean).

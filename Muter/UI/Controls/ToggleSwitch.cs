@@ -6,12 +6,13 @@ using System.Windows.Forms;
 
 namespace Muter.UI.Controls
 {
-    // A 40 x 20 pill switch. On: accent track with a small dark knob on the right. Off: an outlined track with a grey
-    // knob on the left. The knob slides (animated). The control is 2 px larger on every side for the focus ring.
+    // iOS-style switch: a pill track (accent green when on, grey when off) with a white round knob and a soft shadow that
+    // slides (animated). The control is 2 px larger on every side for the focus ring.
     public class ToggleSwitch : Control
     {
         private const int AnimationMs = 150;
-        private static readonly Color OffHover = Color.FromArgb(0x95, 0x9C, 0xA6);
+        private static readonly Color OffTrack = Color.FromArgb(0x3A, 0x3D, 0x44);
+        private static readonly Color OffTrackHover = Color.FromArgb(0x46, 0x49, 0x51);
 
         private readonly Timer animation = new Timer { Interval = 15 };
         private bool isChecked;
@@ -26,7 +27,7 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.SupportsTransparentBackColor, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);
             BackColor = Theme.Surface;
-            Size = new Size(44, 24);
+            Size = new Size(50, 32);
             animation.Tick += (s, e) => Animate();
         }
 
@@ -135,27 +136,29 @@ namespace Muter.UI.Controls
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             float s = DeviceDpi / 96f;
+            int alpha = Enabled ? 255 : 110;
 
             var track = new RectangleF(2 * s, 2 * s, Width - 4 * s, Height - 4 * s);
             float radius = track.Height / 2;
-            Color off = !Enabled ? Theme.DisabledText : hover ? OffHover : Theme.SwitchOff;
-            Color on = !Enabled ? Theme.DisabledFill : hover ? Theme.AccentHover : Theme.Accent;
+            Color off = hover && Enabled ? OffTrackHover : OffTrack;
+            Color on = hover && Enabled ? Theme.AccentHover : Theme.Accent;
+            using (GraphicsPath path = Theme.RoundedRectangle(track, radius))
+            using (var fill = new SolidBrush(Color.FromArgb(alpha, Blend(off, on, position))))
+                g.FillPath(fill, path);
 
-            // Off track (outline) fades into the filled on track.
-            Theme.FillBox(g, track, radius, BackColor, off, s);
-            if (position > 0)
+            // Knob: white circle (2 px inside the track) with a soft shadow, sliding along the track.
+            float margin = 2 * s;
+            float knob = track.Height - 2 * margin;
+            float travel = track.Width - 2 * margin - knob;
+            float x = track.Left + margin + travel * position;
+            float y = track.Top + margin;
+            for (int i = 3; i >= 1; i--)
             {
-                using (GraphicsPath path = Theme.RoundedRectangle(track, radius))
-                using (var fill = new SolidBrush(Color.FromArgb((int)(255 * position), on)))
-                    g.FillPath(fill, path);
+                using (var shadow = new SolidBrush(Color.FromArgb(alpha * 28 / 255, 0, 0, 0)))
+                    g.FillEllipse(shadow, x - i * 0.5f * s, y - i * 0.25f * s + 1.5f * s, knob + i * s, knob + i * s);
             }
-
-            // Knob: 10 px grey when off, 12 px dark when on; its centre slides from 10 px to (width - 10 px).
-            float knob = (10 + 2 * position) * s;
-            float cx = track.Left + track.Height / 2 + (track.Width - track.Height) * position;
-            float cy = track.Top + track.Height / 2;
-            using (var brush = new SolidBrush(Blend(off, Enabled ? Theme.SwitchKnob : Theme.DisabledText, position)))
-                g.FillEllipse(brush, cx - knob / 2, cy - knob / 2, knob, knob);
+            using (var knobBrush = new SolidBrush(Color.FromArgb(alpha, 255, 255, 255)))
+                g.FillEllipse(knobBrush, x, y, knob, knob);
 
             if (Focused && ShowFocusCues)
             {

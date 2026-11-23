@@ -93,14 +93,14 @@ namespace Muter.UI.Controls
                 item.Click += (s, e) => Choose(chosen.Value);
                 menu.Items.Add(item);
             }
-            // Rows are 32 px; the list is at least 300 px (and the button) wide, right-aligned under the button. Every row
+            // Rows are 32 px; the list is as wide as the button (wider only if an entry would not fit), right under it. Every row
             // spans the whole list so the highlight reaches the right edge.
             float scale = DeviceDpi / 96f;
             menu.AutoSize = true;
             DarkMenuRenderer.SizeItems(menu, scale, 0);
             menu.PerformLayout();
             Size natural = menu.GetPreferredSize(Size.Empty);
-            int width = Math.Max(natural.Width, Math.Max(Width, (int)(300 * scale)));
+            int width = Math.Max(natural.Width, Width);
             if (width > natural.Width)
             {
                 DarkMenuRenderer.SizeItems(menu, scale, width - natural.Width);

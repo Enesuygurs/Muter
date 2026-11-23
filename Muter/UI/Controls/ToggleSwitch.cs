@@ -27,7 +27,7 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick | ControlStyles.SupportsTransparentBackColor, true);
             SetStyle(ControlStyles.StandardDoubleClick, false);
             BackColor = Theme.Surface;
-            Size = new Size(50, 32);
+            Size = new Size(42, 26);
             animation.Tick += (s, e) => Animate();
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -84,8 +85,10 @@ namespace Muter.UI.Controls
             {
                 // Vertically centred in the whole row, whatever padding the row has.
                 Rectangle text = e.TextRectangle;
-                e.TextRectangle = new Rectangle(text.X, 0, text.Width, e.Item.Height);
-                e.TextFormat = (e.TextFormat & ~(TextFormatFlags.Top | TextFormatFlags.Bottom)) | TextFormatFlags.VerticalCenter;
+                // Never wider than the row (minus a little room on the right), so a long text ends with an ellipsis.
+                int room = (int)(12 * e.ToolStrip.DeviceDpi / 96f);
+                e.TextRectangle = new Rectangle(text.X, 0, Math.Min(text.Width, Math.Max(1, e.Item.Width - text.X - room)), e.Item.Height);
+                e.TextFormat = (e.TextFormat & ~(TextFormatFlags.Top | TextFormatFlags.Bottom)) | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
             }
             base.OnRenderItemText(e);
         }

@@ -100,12 +100,15 @@ namespace Muter.UI.Controls
             DarkMenuRenderer.SizeItems(menu, scale, 0);
             menu.PerformLayout();
             Size natural = menu.GetPreferredSize(Size.Empty);
-            int width = Math.Max(natural.Width, Width);
-            if (width > natural.Width)
+            // Always exactly as wide as the button: a longer entry is cut with an ellipsis instead of widening the list.
+            int width = Width;
+            menu.AutoSize = false;
+            menu.Size = new Size(width, natural.Height);
+            foreach (ToolStripItem item in menu.Items)
             {
-                DarkMenuRenderer.SizeItems(menu, scale, width - natural.Width);
-                menu.AutoSize = false;
-                menu.Size = new Size(width, natural.Height);
+                int itemHeight = item.Height;
+                item.AutoSize = false;
+                item.Size = new Size(width - 2, itemHeight);
             }
             menu.Show(this, new Point(Width - width, Height + (int)(4 * scale)));
             Invalidate();

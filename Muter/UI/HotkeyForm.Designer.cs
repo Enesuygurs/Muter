@@ -42,9 +42,9 @@
             //
             // iconBox
             //
-            this.iconBox.Location = new System.Drawing.Point(16, 11);
+            this.iconBox.Location = new System.Drawing.Point(14, 12);
             this.iconBox.Name = "iconBox";
-            this.iconBox.Size = new System.Drawing.Size(20, 20);
+            this.iconBox.Size = new System.Drawing.Size(16, 16);
             this.iconBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.iconBox.TabIndex = 0;
             this.iconBox.TabStop = false;
@@ -53,9 +53,9 @@
             // titleLabel
             //
             this.titleLabel.AutoSize = true;
-            this.titleLabel.Font = new System.Drawing.Font("Segoe UI Semibold", 11F, System.Drawing.FontStyle.Bold);
-            this.titleLabel.ForeColor = System.Drawing.Color.FromArgb(243, 243, 243);
-            this.titleLabel.Location = new System.Drawing.Point(42, 11);
+            this.titleLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.titleLabel.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
+            this.titleLabel.Location = new System.Drawing.Point(38, 12);
             this.titleLabel.Name = "titleLabel";
             this.titleLabel.Size = new System.Drawing.Size(94, 20);
             this.titleLabel.TabIndex = 1;
@@ -69,40 +69,43 @@
             this.closeButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 8F);
             this.closeButton.Location = new System.Drawing.Point(333, 1);
             this.closeButton.Name = "closeButton";
-            this.closeButton.Size = new System.Drawing.Size(46, 32);
+            this.closeButton.Size = new System.Drawing.Size(46, 39);
             this.closeButton.TabIndex = 7;
             this.closeButton.TabStop = false;
             this.closeButton.Text = "";
             //
             // descriptionLabel
             //
-            this.descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(167, 167, 167);
-            this.descriptionLabel.Location = new System.Drawing.Point(16, 46);
+            this.descriptionLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F);
+            this.descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
+            this.descriptionLabel.Location = new System.Drawing.Point(24, 48);
             this.descriptionLabel.Name = "descriptionLabel";
-            this.descriptionLabel.Size = new System.Drawing.Size(348, 36);
+            this.descriptionLabel.Size = new System.Drawing.Size(332, 36);
             this.descriptionLabel.TabIndex = 2;
             this.descriptionLabel.Text = "Press the keys you want to use to mute and unmute your microphone from any app.";
             //
             // captureBox
             //
-            this.captureBox.Font = new System.Drawing.Font("Segoe UI Semibold", 10.5F, System.Drawing.FontStyle.Bold);
-            this.captureBox.Location = new System.Drawing.Point(16, 86);
+            this.captureBox.Font = new System.Drawing.Font("Segoe UI Semibold", 11F);
+            this.captureBox.Location = new System.Drawing.Point(24, 100);
             this.captureBox.Name = "captureBox";
-            this.captureBox.Size = new System.Drawing.Size(348, 78);
+            this.captureBox.Size = new System.Drawing.Size(332, 96);
             this.captureBox.TabIndex = 0;
             //
             // statusLabel
             //
-            this.statusLabel.ForeColor = System.Drawing.Color.FromArgb(167, 167, 167);
-            this.statusLabel.Location = new System.Drawing.Point(16, 172);
+            this.statusLabel.ForeColor = System.Drawing.Color.FromArgb(160, 166, 176);
+            this.statusLabel.Location = new System.Drawing.Point(48, 208);
             this.statusLabel.Name = "statusLabel";
-            this.statusLabel.Size = new System.Drawing.Size(348, 34);
+            this.statusLabel.Padding = new System.Windows.Forms.Padding(0, 1, 0, 0);
+            this.statusLabel.Size = new System.Drawing.Size(308, 34);
             this.statusLabel.TabIndex = 3;
             //
             // resetButton
             //
             this.resetButton.ButtonStyle = Muter.UI.Controls.FlatButtonStyle.Link;
-            this.resetButton.Location = new System.Drawing.Point(16, 214);
+            this.resetButton.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.resetButton.Location = new System.Drawing.Point(24, 278);
             this.resetButton.Name = "resetButton";
             this.resetButton.Size = new System.Drawing.Size(112, 28);
             this.resetButton.TabIndex = 4;
@@ -112,20 +115,20 @@
             // cancelButton
             //
             this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cancelButton.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
-            this.cancelButton.Location = new System.Drawing.Point(196, 212);
+            this.cancelButton.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.cancelButton.Location = new System.Drawing.Point(172, 278);
             this.cancelButton.Name = "cancelButton";
-            this.cancelButton.Size = new System.Drawing.Size(80, 32);
+            this.cancelButton.Size = new System.Drawing.Size(88, 32);
             this.cancelButton.TabIndex = 5;
             this.cancelButton.Text = "Cancel";
             //
             // saveButton
             //
             this.saveButton.ButtonStyle = Muter.UI.Controls.FlatButtonStyle.Primary;
-            this.saveButton.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
-            this.saveButton.Location = new System.Drawing.Point(284, 212);
+            this.saveButton.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.saveButton.Location = new System.Drawing.Point(268, 278);
             this.saveButton.Name = "saveButton";
-            this.saveButton.Size = new System.Drawing.Size(80, 32);
+            this.saveButton.Size = new System.Drawing.Size(88, 32);
             this.saveButton.TabIndex = 6;
             this.saveButton.Text = "Save";
             this.saveButton.Click += new System.EventHandler(this.SaveButton_Click);
@@ -135,9 +138,9 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
-            this.BackColor = System.Drawing.Color.FromArgb(31, 31, 31);
+            this.BackColor = System.Drawing.Color.FromArgb(20, 22, 26);
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(380, 258);
+            this.ClientSize = new System.Drawing.Size(380, 326);
             this.Controls.Add(this.saveButton);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.resetButton);
@@ -147,8 +150,8 @@
             this.Controls.Add(this.closeButton);
             this.Controls.Add(this.titleLabel);
             this.Controls.Add(this.iconBox);
-            this.Font = new System.Drawing.Font("Segoe UI Semibold", 9F);
-            this.ForeColor = System.Drawing.Color.FromArgb(243, 243, 243);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.KeyPreview = true;
             this.MaximizeBox = false;

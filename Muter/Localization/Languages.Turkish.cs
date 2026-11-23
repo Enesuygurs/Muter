@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Mikrofon açılıp kapanınca kısa bir ses çalar",
             ShowOverlay = "Overlay'i göster",
             ShowOverlayHint = "Mikrofon açılıp kapandığında görünür",
+            SectionPreview = "Önizleme",
+            ShowNow = "Şimdi göster",
             Position = "Konum",
             PositionHint = "Sürüklemek için Özel'i seçin",
             Size = "Boyut",

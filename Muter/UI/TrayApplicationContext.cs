@@ -105,7 +105,7 @@ namespace Muter.UI
             overlay.FormClosing += OnOverlayClosing;
             miniIndicator.FormClosing += OnOverlayClosing;
 
-            menu = new ContextMenuStrip { Font = menuFont, Renderer = new DarkMenuRenderer() };
+            menu = new ContextMenuStrip { Font = menuFont, Renderer = new TrayMenuRenderer() };
             menu.Opening += (s, e) =>
             {
                 RebuildMenu();
@@ -649,6 +649,9 @@ namespace Muter.UI
             if (show)
                 overlay.ShowTransient();
         }
+
+        // The overlay as it is now, for the preview's "Show now".
+        internal void ShowOverlayNow() => overlay.ShowTransient();
 
         internal void SetOverlayAnchor(OverlayAnchor anchor)
         {

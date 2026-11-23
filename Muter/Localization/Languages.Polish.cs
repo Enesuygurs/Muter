@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Krótki dźwięk przy włączeniu i wyciszeniu mikrofonu",
             ShowOverlay = "Pokaż nakładkę",
             ShowOverlayHint = "Pojawia się przy włączeniu lub wyciszeniu mikrofonu",
+            SectionPreview = "Podgląd",
+            ShowNow = "Pokaż teraz",
             Position = "Położenie",
             PositionHint = "Wybierz Własna, aby przeciągnąć",
             Size = "Rozmiar",

@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Een kort geluid als de microfoon aan of uit gaat",
             ShowOverlay = "Overlay tonen",
             ShowOverlayHint = "Verschijnt als de microfoon aan of uit gaat",
+            SectionPreview = "Voorbeeld",
+            ShowNow = "Nu tonen",
             Position = "Positie",
             PositionHint = "Kies Aangepast om te slepen",
             Size = "Grootte",

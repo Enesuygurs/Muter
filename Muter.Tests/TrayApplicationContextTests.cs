@@ -293,7 +293,7 @@ namespace Muter.Tests
             {
                 app.RebuildMenu();
                 Assert.Equal(new[] { "Devices", "Settings...", "Exit" }, app.Menu.Items.OfType<ToolStripMenuItem>().Select(i => i.Text).ToArray());
-                Assert.IsType<DarkMenuRenderer>(app.Menu.Renderer);
+                Assert.IsType<TrayMenuRenderer>(app.Menu.Renderer);
 
                 FindItem(app, "Settings...").PerformClick();
                 SettingsForm first = app.SettingsWindow;

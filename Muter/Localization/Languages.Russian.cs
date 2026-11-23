@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "Короткий звук при включении и выключении микрофона",
             ShowOverlay = "Показывать оверлей",
             ShowOverlayHint = "Появляется при включении и выключении микрофона",
+            SectionPreview = "Предпросмотр",
+            ShowNow = "Показать",
             Position = "Положение",
             PositionHint = "«Своё» — чтобы перетащить",
             Size = "Размер",

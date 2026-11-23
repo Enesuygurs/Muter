@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "マイクのオン/オフ時に短い音を鳴らします",
             ShowOverlay = "オーバーレイを表示",
             ShowOverlayHint = "マイクのオン/オフ時に表示されます",
+            SectionPreview = "プレビュー",
+            ShowNow = "今すぐ表示",
             Position = "位置",
             PositionHint = "カスタムを選ぶとドラッグできます",
             Size = "サイズ",

@@ -102,6 +102,8 @@ namespace Muter.Localization
             SoundFeedbackHint = "마이크를 켜거나 끌 때 짧은 소리",
             ShowOverlay = "오버레이 표시",
             ShowOverlayHint = "마이크를 켜거나 끌 때 나타납니다",
+            SectionPreview = "미리 보기",
+            ShowNow = "지금 표시",
             Position = "위치",
             PositionHint = "사용자 지정을 선택하면 끌 수 있음",
             Size = "크기",

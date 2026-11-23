@@ -23,7 +23,7 @@ namespace Muter.UI.Controls
         public bool Enabled { get; }
     }
 
-    // A themed dropdown: shows the selected option and opens a dark menu with all options.
+    // A themed dropdown: shows the selected option with a chevron and opens a list of all options under it.
     public class DropdownButton : Control
     {
         private readonly ContextMenuStrip menu;
@@ -37,8 +37,8 @@ namespace Muter.UI.Controls
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
             BackColor = Theme.Surface;
             ForeColor = Theme.TextPrimary;
-            Size = new Size(200, 30);
-            menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true };
+            Size = new Size(208, 32);
+            menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), ShowImageMargin = false, ShowCheckMargin = true, DropShadowEnabled = true };
             menu.Closed += (s, e) => Invalidate();
         }
 
@@ -93,25 +93,25 @@ namespace Muter.UI.Controls
                 item.Click += (s, e) => Choose(chosen.Value);
                 menu.Items.Add(item);
             }
-            // The list is exactly as wide as the button and every item spans it (a minimum size alone would leave an
-            // empty strip on the right that the highlight does not reach). Rows are a bit taller than the default.
+            // Rows are 32 px; the list is as wide as the button (wider only if an entry would not fit), right under it. Every row
+            // spans the whole list so the highlight reaches the right edge.
             float scale = DeviceDpi / 96f;
-            int vertical = (int)(4 * scale);
             menu.AutoSize = true;
-            foreach (ToolStripItem item in menu.Items)
-                item.Padding = new Padding(0, vertical, 0, vertical);
+            DarkMenuRenderer.SizeItems(menu, scale, 0);
             menu.PerformLayout();
             Size natural = menu.GetPreferredSize(Size.Empty);
-            int extra = Width - natural.Width;
-            if (extra > 0)
+            // Always exactly as wide as the button: a longer entry is cut with an ellipsis instead of widening the list.
+            int width = Width;
+            menu.AutoSize = false;
+            menu.Size = new Size(width, natural.Height);
+            foreach (ToolStripItem item in menu.Items)
             {
-                // WinForms does not grow the list for item padding, so the list width is set explicitly.
-                foreach (ToolStripItem item in menu.Items)
-                    item.Padding = new Padding(0, vertical, extra, vertical);
-                menu.AutoSize = false;
-                menu.Size = new Size(Width, natural.Height);
+                int itemHeight = item.Height;
+                item.AutoSize = false;
+                item.Size = new Size(width - 2, itemHeight);
             }
-            menu.Show(this, new Point(0, Height + (int)(2 * scale)));
+            menu.Show(this, new Point(Width - width, Height + (int)(4 * scale)));
+            Invalidate();
         }
 
         protected override void OnClick(EventArgs e)
@@ -170,24 +170,18 @@ namespace Muter.UI.Controls
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality; // crisp, equal 1 px edges on every side
             float s = DeviceDpi / 96f;
-            var bounds = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             bool open = menu.Visible;
-            using (GraphicsPath path = Theme.RoundedRectangle(bounds, 4 * s))
-            using (var fill = new SolidBrush(hover || open ? Theme.ButtonHover : Theme.ButtonFill))
-            using (var pen = new Pen(Focused && ShowFocusCues ? Theme.TextPrimary : open ? Theme.Accent : Theme.ButtonBorder, s))
-            {
-                g.FillPath(fill, path);
-                g.DrawPath(pen, path);
-            }
+            Color border = !Enabled ? Theme.DisabledFill : open ? Theme.Accent : Focused && ShowFocusCues ? Theme.TextPrimary : Theme.ButtonBorder;
+            Theme.FillBox(g, ClientRectangle, 6 * s, !Enabled ? Theme.DisabledFill : hover || open ? Theme.ButtonHover : Theme.ButtonFill, border, s);
 
-            int chevronWidth = (int)(28 * s);
-            var textBounds = new Rectangle((int)(10 * s), 0, Width - chevronWidth - (int)(10 * s), Height);
-            TextRenderer.DrawText(g, SelectedText, Font, textBounds, Enabled ? Theme.TextPrimary : Theme.TextDisabled,
+            int chevronWidth = (int)(32 * s);
+            var textBounds = new Rectangle((int)(12 * s), 0, Width - chevronWidth - (int)(12 * s), Height);
+            TextRenderer.DrawText(g, SelectedText, Font, textBounds, Enabled ? Theme.TextPrimary : Theme.DisabledText,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 
-            using (var glyphFont = new Font(Theme.IconFontFamily, 7f * Font.SizeInPoints / 9f))
+            using (var glyphFont = new Font(Theme.IconFontFamily, 8f))
             {
-                TextRenderer.DrawText(g, "", glyphFont, new Rectangle(Width - chevronWidth, 0, chevronWidth, Height), Theme.TextSecondary,
+                TextRenderer.DrawText(g, open ? "" : "", glyphFont, new Rectangle(Width - chevronWidth, 0, chevronWidth - (int)(8 * s), Height), Theme.TextSecondary,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
             }
         }

@@ -167,18 +167,17 @@ namespace Muter.Tests
             });
         }
 
+        // The label must fit on one line; the hint may wrap, but to two lines at most.
         private static void CheckRow(SettingRow row, List<string> problems)
         {
-            float s = row.DeviceDpi / 96f;
-            int available = (row.Setting != null ? row.Setting.Left - (int)(12 * s) : row.Width - (int)(16 * s)) - (int)(16 * s);
-            using (var title = new Font(row.Font.FontFamily, row.Font.SizeInPoints, FontStyle.Regular))
-            using (var description = new Font(row.Font.FontFamily, row.Font.SizeInPoints * 0.88f))
-            {
-                if (TextRenderer.MeasureText(row.Title, title, Size.Empty, RowFlags).Width > available)
-                    problems.Add($"title \"{row.Title}\"");
-                if (TextRenderer.MeasureText(row.Description, description, Size.Empty, RowFlags).Width > available)
-                    problems.Add($"hint \"{row.Description}\"");
-            }
+            int available = row.TextWidth;
+            if (TextRenderer.MeasureText(row.Title, row.Font, Size.Empty, RowFlags).Width > available)
+                problems.Add($"title \"{row.Title}\"");
+            int oneLine = TextRenderer.MeasureText("Ag", row.HintFont, Size.Empty, RowFlags).Height;
+            int hint = TextRenderer.MeasureText(row.Description, row.HintFont, new Size(available, int.MaxValue),
+                TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
+            if (hint > 2 * oneLine)
+                problems.Add($"hint \"{row.Description}\"");
         }
 
         [Theory]

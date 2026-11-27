@@ -333,7 +333,7 @@ namespace Muter.UI
         private FlatButton NewButton(string text, params string[] alternatives)
         {
             int width = alternatives.Concat(new[] { text }).Max(t => TextRenderer.MeasureText(t, ButtonMeasureFont).Width) + 32;
-            return new FlatButton { Text = text, Size = new Size(Math.Max(72, width), 32), Font = ControlFont };
+            return new FlatButton { Text = text, Size = new Size(Math.Max(72, width), 32), Font = ControlFont, BackColor = Theme.Surface };
         }
 
         // The keycaps of a hotkey followed by a Change button.

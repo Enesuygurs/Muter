@@ -54,7 +54,7 @@
             //
             this.titleLabel.AutoSize = true;
             this.titleLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.titleLabel.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
+            this.titleLabel.ForeColor = System.Drawing.Color.FromArgb(245, 246, 255);
             this.titleLabel.Location = new System.Drawing.Point(38, 12);
             this.titleLabel.Name = "titleLabel";
             this.titleLabel.Size = new System.Drawing.Size(94, 20);
@@ -77,7 +77,7 @@
             // descriptionLabel
             //
             this.descriptionLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            this.descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
+            this.descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(245, 246, 255);
             this.descriptionLabel.Location = new System.Drawing.Point(24, 48);
             this.descriptionLabel.Name = "descriptionLabel";
             this.descriptionLabel.Size = new System.Drawing.Size(332, 36);
@@ -94,7 +94,7 @@
             //
             // statusLabel
             //
-            this.statusLabel.ForeColor = System.Drawing.Color.FromArgb(160, 166, 176);
+            this.statusLabel.ForeColor = System.Drawing.Color.FromArgb(160, 165, 200);
             this.statusLabel.Location = new System.Drawing.Point(48, 208);
             this.statusLabel.Name = "statusLabel";
             this.statusLabel.Padding = new System.Windows.Forms.Padding(0, 1, 0, 0);
@@ -138,7 +138,7 @@
             this.AcceptButton = this.saveButton;
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
-            this.BackColor = System.Drawing.Color.FromArgb(20, 22, 26);
+            this.BackColor = System.Drawing.Color.FromArgb(15, 16, 32);
             this.CancelButton = this.cancelButton;
             this.ClientSize = new System.Drawing.Size(380, 326);
             this.Controls.Add(this.saveButton);
@@ -151,7 +151,7 @@
             this.Controls.Add(this.titleLabel);
             this.Controls.Add(this.iconBox);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.ForeColor = System.Drawing.Color.FromArgb(232, 234, 237);
+            this.ForeColor = System.Drawing.Color.FromArgb(245, 246, 255);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.KeyPreview = true;
             this.MaximizeBox = false;

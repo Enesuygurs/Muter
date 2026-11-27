@@ -3,51 +3,51 @@ using System.Drawing.Drawing2D;
 
 namespace Muter.UI.Controls
 {
-    // The flat dark theme shared by Muter's windows (design tokens). The accent is the green of the app icon.
+    // The flat dark theme shared by Muter's windows (design tokens). Midnight palette: deep navy with a violet accent.
     internal static class Theme
     {
-        public static readonly Color Background = Hex(0x14161A);   // window, title bar, navigation
-        public static readonly Color Surface = Hex(0x1C1F25);      // cards
-        public static readonly Color Border = Hex(0x262A31);       // card border, dividers
-        public static readonly Color WindowBorder = Hex(0x2C3038);
-        public static readonly Color TextPrimary = Hex(0xE8EAED);
-        public static readonly Color TextSecondary = Hex(0xA0A6B0); // hints, section headers
-        public static readonly Color TextDisabled = Hex(0x6E7581);  // footer, "+" between keys
+        public static readonly Color Background = Hex(0x0F1020);   // window, title bar, navigation
+        public static readonly Color Surface = Hex(0x181A2E);      // cards
+        public static readonly Color Border = Hex(0x262944);       // card border, dividers
+        public static readonly Color WindowBorder = Hex(0x2A2D4A);
+        public static readonly Color TextPrimary = Hex(0xF5F6FF);
+        public static readonly Color TextSecondary = Hex(0xA0A5C8); // hints, section headers
+        public static readonly Color TextDisabled = Hex(0x5B6082);  // footer, "+" between keys
 
-        public static readonly Color Accent = Hex(0x22C55E);
-        public static readonly Color AccentHover = Hex(0x34D06E);
-        public static readonly Color AccentPressed = Hex(0x1DAE52);
-        public static readonly Color AccentText = Hex(0x052E16);    // text on accent
-        public static readonly Color Link = Hex(0x4ADE80);
+        public static readonly Color Accent = Hex(0x7B61FF);
+        public static readonly Color AccentHover = Hex(0x8E78FF);
+        public static readonly Color AccentPressed = Hex(0x6A50E8);
+        public static readonly Color AccentText = Hex(0xFFFFFF);    // text on accent
+        public static readonly Color Link = Hex(0x9B87FF);
         public static readonly Color Success = Hex(0x4ADE80);
 
         public static readonly Color Error = Hex(0xF87171);
         public static readonly Color ErrorBorder = Hex(0xF87171);
 
-        public static readonly Color ButtonFill = Hex(0x252930);    // controls: buttons, dropdowns
-        public static readonly Color ButtonHover = Hex(0x2B3038);
-        public static readonly Color ButtonPressed = Hex(0x20242A);
-        public static readonly Color ButtonBorder = Hex(0x353A44);
-        public static readonly Color DisabledFill = Hex(0x22252B);
-        public static readonly Color DisabledText = Hex(0x5B616C);
+        public static readonly Color ButtonFill = Hex(0x23263F);    // controls: buttons, dropdowns
+        public static readonly Color ButtonHover = Hex(0x2D3152);
+        public static readonly Color ButtonPressed = Hex(0x1D2036);
+        public static readonly Color ButtonBorder = Hex(0x33375A);
+        public static readonly Color DisabledFill = Hex(0x1B1E33);
+        public static readonly Color DisabledText = Hex(0x565B7C);
         public static readonly Color AccentDisabled = DisabledFill;
         public static readonly Color CloseHover = Color.FromArgb(196, 43, 28);
 
-        public static readonly Color NavSelected = Hex(0x22262D);
-        public static readonly Color MenuHover = Hex(0x2B3038);
-        public static readonly Color Popup = Hex(0x20242A);
-        public static readonly Color PopupBorder = Hex(0x363B45);
-        public static readonly Color Inset = Hex(0x101216);         // hotkey capture area
-        public static readonly Color SegmentTrack = Hex(0x14161A);
-        public static readonly Color SegmentSelected = Hex(0x32373F);
-        public static readonly Color SegmentSelectedBorder = Hex(0x3E4450);
-        public static readonly Color SwitchOff = Hex(0x7A818C);
-        public static readonly Color SwitchKnob = Hex(0x0B1F12);
-        public static readonly Color DialogFooter = Hex(0x181A1F);
+        public static readonly Color NavSelected = Hex(0x1F2240);
+        public static readonly Color MenuHover = Hex(0x2D3152);
+        public static readonly Color Popup = Hex(0x1D2036);
+        public static readonly Color PopupBorder = Hex(0x33375A);
+        public static readonly Color Inset = Hex(0x0B0C18);         // hotkey capture area
+        public static readonly Color SegmentTrack = Hex(0x0F1020);
+        public static readonly Color SegmentSelected = Hex(0x2D3152);
+        public static readonly Color SegmentSelectedBorder = Hex(0x3A3F66);
+        public static readonly Color SwitchOff = Hex(0x4A4F78);
+        public static readonly Color SwitchKnob = Hex(0xFFFFFF);
+        public static readonly Color DialogFooter = Hex(0x13152A);
 
-        public static readonly Color KeycapFill = Hex(0x2A2E36);
-        public static readonly Color KeycapBorder = Hex(0x3D434E);
-        public static readonly Color KeycapShadow = Hex(0x0C0E11);  // the darker bottom edge
+        public static readonly Color KeycapFill = Hex(0x252845);
+        public static readonly Color KeycapBorder = Hex(0x3A3F66);
+        public static readonly Color KeycapShadow = Hex(0x080915);  // the darker bottom edge
 
         // Microphone states: fill, ink on the fill, text on a dark panel.
         public static readonly Color LiveFill = Hex(0x22C55E), LiveInk = Hex(0x052E16), LiveText = Hex(0x4ADE80);

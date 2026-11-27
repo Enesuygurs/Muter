@@ -46,7 +46,7 @@ namespace Muter.UI
         private readonly MiniIndicatorForm miniIndicator;
         private readonly NotifyIcon trayIcon;
         private readonly ContextMenuStrip menu;
-        private readonly Font menuFont = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+        private readonly Font menuFont = new Font("Segoe UI", 9.5F, FontStyle.Regular);
         private readonly Timer pollTimer = new Timer { Interval = PollIntervalMs };
         private readonly SynchronizationContext uiContext;
         private readonly CloseRequestFilter closeRequestFilter;
@@ -243,6 +243,8 @@ namespace Muter.UI
             menu.Items.Add(Item(Strings.Current.MenuSettings, false, () => OpenSettings()));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Item(Strings.Current.MenuExit, false, ExitThread));
+
+            TrayMenuRenderer.Apply(menu, menuFont);
         }
 
         protected override void ExitThreadCore()

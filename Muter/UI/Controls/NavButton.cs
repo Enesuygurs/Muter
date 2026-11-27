@@ -22,7 +22,7 @@ namespace Muter.UI.Controls
     // left and semibold text.
     public class NavButton : Control
     {
-        private static readonly Color HoverFill = Color.FromArgb(0x1B, 0x1E, 0x23);
+        private static readonly Color HoverFill = Color.FromArgb(0x17, 0x1A, 0x30);
         private Font selectedFont;
         private bool selected;
         private bool hover;

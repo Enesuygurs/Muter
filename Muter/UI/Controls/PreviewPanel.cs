@@ -12,12 +12,12 @@ namespace Muter.UI.Controls
     {
         private const int ThumbWidth = 220;
         private const int ThumbHeight = 124;
-        private static readonly Color Screen = Color.FromArgb(0x0F, 0x11, 0x14);
-        private static readonly Color WindowA = Color.FromArgb(0x23, 0x27, 0x2E);
-        private static readonly Color WindowB = Color.FromArgb(0x1C, 0x20, 0x26);
-        private static readonly Color WindowLine = Color.FromArgb(0x2E, 0x33, 0x3B);
-        private static readonly Color TextLine = Color.FromArgb(0x30, 0x35, 0x3E);
-        private static readonly Color Taskbar = Color.FromArgb(0x1A, 0x1D, 0x22);
+        private static readonly Color Screen = Color.FromArgb(0x0B, 0x0C, 0x18);
+        private static readonly Color WindowA = Color.FromArgb(0x1F, 0x22, 0x40);
+        private static readonly Color WindowB = Color.FromArgb(0x18, 0x1A, 0x2E);
+        private static readonly Color WindowLine = Color.FromArgb(0x2A, 0x2D, 0x4A);
+        private static readonly Color TextLine = Color.FromArgb(0x2E, 0x32, 0x57);
+        private static readonly Color Taskbar = Color.FromArgb(0x14, 0x16, 0x2A);
 
         private bool forOverlay = true;
         private OverlayAnchor anchor = OverlayAnchor.LowerCenter;

@@ -11,8 +11,8 @@ namespace Muter.UI.Controls
     public class ToggleSwitch : Control
     {
         private const int AnimationMs = 150;
-        private static readonly Color OffTrack = Color.FromArgb(0x3A, 0x3D, 0x44);
-        private static readonly Color OffTrackHover = Color.FromArgb(0x46, 0x49, 0x51);
+        private static readonly Color OffTrack = Color.FromArgb(0x33, 0x37, 0x5A);
+        private static readonly Color OffTrackHover = Color.FromArgb(0x3F, 0x44, 0x6E);
 
         private readonly Timer animation = new Timer { Interval = 15 };
         private bool isChecked;
